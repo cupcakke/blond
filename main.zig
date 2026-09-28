@@ -441,6 +441,8 @@ const SearchState = struct {
     investigations: std.ArrayList(*Investigation),
     latest: []u8,
     started_ns: i128 = 0,
+    thread_count: u32 = 0,
+    threads: [16]?std.Thread = [_]?std.Thread{null} ** 16,
 
     fn init(allocator: Allocator) !SearchState {
         return .{
@@ -461,7 +463,14 @@ const SearchState = struct {
         self.mutex.lock();
         self.running = false;
         self.stopping = true;
+        const count = self.thread_count;
+        self.thread_count = 0;
         self.mutex.unlock();
+        var i: u32 = 0;
+        while (i < count) : (i += 1) {
+            if (self.threads[i]) |thread| thread.join();
+            self.threads[i] = null;
+        }
     }
 
     fn isRunning(self: *SearchState) bool {
@@ -914,7 +923,14 @@ fn startSearch(state: *SearchState, workers: u32) !void {
     state.mutex.unlock();
     var i: u32 = 0;
     while (i < workers) : (i += 1) {
-        _ = try std.Thread.spawn(.{}, worker, .{state});
+        const thread = std.Thread.spawn(.{}, worker, .{state}) catch {
+            state.stop();
+            return error.ThreadSpawnFailed;
+        };
+        state.mutex.lock();
+        state.threads[i] = thread;
+        state.thread_count = i + 1;
+        state.mutex.unlock();
     }
 }
 

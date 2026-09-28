@@ -95,7 +95,7 @@ footer{display:flex;justify-content:space-between;gap:16px;margin-top:18px;color
 <div class="control-row"><label>Scheduling</label><span class="status running"><b></b><span>parallel dovetail</span></span></div>
 <div class="control-row"><label>Coefficient field</label><span>ℚ(i)</span></div>
 <div class="control-row"><label>Arithmetic</label><span>normalized rationals</span></div>
-<div class="control-row"><label>Collision points</label><span>ℤ[i] enumeration</span></div>
+<div class="control-row"><label>Collision points</label><span>ℤ² enumeration</span></div>
 </div>
 </section>
 <section class="card search-card">
@@ -136,8 +136,8 @@ function render(data){
 function renderLatest(value){
  if(!value||!value.P){$("resultMeta").textContent="no retained pair";return;}
  $("resultMeta").textContent=`stage ${value.stage??"—"} · local ${value.local??"—"}`;
- const collision=value.collision?`<div class="formula-wide"><code>collision = ${escapeHtml(value.collision)}</code></div>`:"";
- $("latest").innerHTML=`<div class="candidate"><div class="candidate-top"><h3>${value.collision?"Verified collision":"Jacobian-one candidate"}</h3><span>${value.collision?"exact evaluation matched":"investigation queued"}</span></div><div class="formula-wide"><code>P(x,y) = ${escapeHtml(value.P||"")}</code></div><div class="formula-wide"><code>Q(x,y) = ${escapeHtml(value.Q||"")}</code></div><div class="formula-wide"><code>J(P,Q) − 1 = ${escapeHtml(value.J||"")}</code></div>${collision}<div class="cert">${escapeHtml(value.certificate||"")}</div></div>`;
+ const collision=value.collision?`<div class="formula-wide"><code>p₁ ≠ p₂ and P(p₁)=P(p₂), Q(p₁)=Q(p₂)<br>${escapeHtml(JSON.stringify(value.collision))}</code></div>`:"";
+ $("latest").innerHTML=`<div class="candidate"><div class="candidate-top"><h3>${value.collision?"Verified collision":"Jacobian-one candidate"}</h3><span>${value.collision?"exact evaluation matched":"investigation queued"}</span></div><div class="formula-wide"><code>P(x,y) = ${escapeHtml(value.P||"")}</code><code>Q(x,y) = ${escapeHtml(value.Q||"")}</code></div><div class="formula-wide"><code>Pₓ = ${escapeHtml(value.Px||"0")}</code><code>Pᵧ = ${escapeHtml(value.Py||"0")}</code><code>Qₓ = ${escapeHtml(value.Qx||"0")}</code><code>Qᵧ = ${escapeHtml(value.Qy||"0")}</code></div><div class="formula-wide"><code>J(P,Q) − 1 = ${escapeHtml(value.JminusOne||"")}</code><code>J(P,Q) = ${escapeHtml(value.J||"")}</code></div>${collision}<div class="cert">${escapeHtml(value.certificate||"")}</div></div>`;
  addLog(value.collision?"verified exact collision":"retained Jacobian-one pair",value.collision?"good":"event");
 }
 function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
