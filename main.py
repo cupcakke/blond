@@ -172,3 +172,9 @@ def run_dicritical_groebner(DP, DQ, m, n, N, order="grevlex"):
     G = sp.groebner(eqs, *vars_, order=order)
     print("Groebner basis =", [g.as_expr() for g in G.polys])
     return P, Q, xser, yser, eqs, vars_, G
+
+
+if __name__ == "__main__":
+    P, Q, _ = normalized_dense(2, 2)
+    print("P =", P)
+    print("Q =", Q)
