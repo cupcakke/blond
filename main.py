@@ -65,6 +65,13 @@ def verify_candidate(P, Q, p1=(0, 0), p2=(1, 0)):
     return sp.expand(Jm) == 0 and sp.expand(dP) == 0 and sp.expand(dQ) == 0
 
 
+def divide_polynomials(f, g):
+    """Divide f by g as multivariate polynomials in x and y."""
+    if sp.expand(g) == 0:
+        raise ZeroDivisionError("Cannot divide by the zero polynomial.")
+    return sp.div(sp.Poly(f, x, y), sp.Poly(g, x, y))
+
+
 def fiber_resultant_certificate(P, Q):
     R = sp.factor(sp.resultant(P - U, Q - V, y))
     print("Resultant_y(P-U,Q-V) =")
@@ -175,6 +182,9 @@ def run_dicritical_groebner(DP, DQ, m, n, N, order="grevlex"):
 
 
 if __name__ == "__main__":
-    P, Q, _ = normalized_dense(2, 2)
-    print("P =", P)
-    print("Q =", Q)
+    f, g, _ = normalized_dense(2, 2)
+    quotient, remainder = divide_polynomials(f, g)
+    print("f(x, y) =", f)
+    print("g(x, y) =", g)
+    print("Hányados =", quotient.as_expr())
+    print("Maradék  =", remainder.as_expr())
