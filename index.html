@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="hu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jacobian Search Engine</title>
+<style>
+:root{color-scheme:dark;--bg:#080d16;--panel:#101927;--panel2:#162335;--line:#263650;--text:#edf4ff;--muted:#8fa5c3;--blue:#55a8ff;--cyan:#58e0d0;--green:#50d890;--amber:#f6c15a;--red:#ff6f86;--shadow:0 24px 70px rgba(0,0,0,.28)}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:radial-gradient(circle at 80% 0,#152c4b 0,transparent 36rem),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+body{padding:28px}
+main{max-width:1440px;margin:0 auto}
+header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:24px}
+.eyebrow{display:flex;align-items:center;gap:10px;color:var(--cyan);font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase}
+.eyebrow i{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 18px var(--cyan)}
+h1{font-size:clamp(28px,4vw,48px);line-height:1.02;margin:14px 0 10px;letter-spacing:-.045em}
+.subtitle{max-width:760px;color:var(--muted);font-size:15px;line-height:1.65;margin:0}
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+button,select{font:inherit;border:1px solid var(--line);border-radius:10px;color:var(--text);background:var(--panel2);padding:11px 16px;cursor:pointer;transition:transform .16s,border-color .16s,background .16s,opacity .16s}
+button:hover:not(:disabled),select:hover{border-color:var(--blue);background:#1d304b;transform:translateY(-1px)}
+button:disabled{cursor:not-allowed;opacity:.45}
+.primary{background:var(--blue);border-color:var(--blue);color:#06101d;font-weight:800}
+.danger{color:#ffdce2;border-color:#713347}
+.status{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:9px 13px;color:var(--muted);font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace}
+.status b{width:8px;height:8px;border-radius:50%;background:#667891}
+.status.running{border-color:#23694d;color:#9cf4c4}.status.running b{background:var(--green);box-shadow:0 0 12px var(--green)}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:linear-gradient(145deg,rgba(22,35,53,.92),rgba(12,20,32,.94));border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
+.card-title{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 0}
+.card-title h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:#b5c7df;margin:0}
+.card-title span{color:var(--muted);font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.metrics{grid-column:span 12;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line)}
+.metric{min-height:112px;padding:20px;background:var(--panel)}
+.metric .label{color:var(--muted);font-size:12px;margin-bottom:15px}
+.metric strong{font:700 clamp(23px,3vw,34px)/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.05em}
+.metric small{display:block;margin-top:10px;color:var(--muted);font-size:11px}
+.control{grid-column:span 4;min-height:244px}
+.search-card{grid-column:span 8;min-height:244px}
+.body{padding:18px 20px 20px}
+.control-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid rgba(38,54,80,.62)}
+.control-row:last-child{border-bottom:0}
+.control-row label{color:var(--muted);font-size:13px}
+.control-row select{min-width:126px;padding:8px 11px}
+.search-card .body{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.formula{background:#0a111d;border:1px solid #1f314b;border-radius:11px;padding:15px;min-height:132px}
+.formula h3{margin:0 0 12px;color:var(--cyan);font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase}
+.formula code{display:block;color:#e1ebfb;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-word}
+.latest{grid-column:span 8;min-height:300px}
+.stream{grid-column:span 4;min-height:300px}
+.latest-content{padding:18px 20px 20px}
+.empty{display:grid;place-items:center;min-height:205px;text-align:center;color:var(--muted);border:1px dashed #2a3c58;border-radius:11px;padding:22px}
+.empty strong{display:block;color:#b9cbe2;margin-bottom:8px}
+.candidate{display:grid;gap:12px}
+.candidate-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.candidate-top h3{margin:0;font-size:16px}
+.candidate-top span{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.formula-wide{background:#0a111d;border:1px solid #1f314b;border-radius:11px;padding:14px;overflow:auto}
+.formula-wide code{font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;color:#dce9fb;white-space:pre-wrap;word-break:break-word}
+.cert{color:var(--muted);font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-word}
+.stream-body{padding:16px 20px 20px}
+.log{height:230px;overflow:auto;background:#090f18;border-radius:11px;border:1px solid #1c2b42;padding:13px;font:11px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;color:#8fa5c3}
+.log div{padding:2px 0;border-bottom:1px solid rgba(38,54,80,.38)}
+.log .good{color:var(--green)}.log .event{color:var(--blue)}.log .warn{color:var(--amber)}
+footer{display:flex;justify-content:space-between;gap:16px;margin-top:18px;color:#607591;font-size:11px;line-height:1.5}
+@media(max-width:1000px){.control,.search-card,.latest,.stream{grid-column:span 12}.metrics{grid-template-columns:repeat(3,1fr)}header{flex-direction:column}.actions{justify-content:flex-start}}
+@media(max-width:600px){body{padding:16px}.metrics{grid-template-columns:repeat(2,1fr)}.metric:last-child{grid-column:span 2}.search-card .body{grid-template-columns:1fr}footer{flex-direction:column}.actions{width:100%}.actions button,.actions select{flex:1}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<section>
+<div class="eyebrow"><i></i> Exact algebraic computation</div>
+<h1>Jacobian collision search</h1>
+<p class="subtitle">Párhuzamos, fair-dovetailing keresés növekvő fokszámmal és együttható-komplexitással. A motor egzakt Gauss-racionális aritmetikát, Jacobian-ellenőrzést, közvetlen pontenumerációt és eliminációs tanúsítványt használ.</p>
+</section>
+<div class="actions">
+<span class="status" id="status"><b></b><span>stopped</span></span>
+<select id="workers" aria-label="Worker count"><option value="1">1 worker</option><option value="2">2 workers</option><option value="4" selected>4 workers</option><option value="8">8 workers</option><option value="16">16 workers</option></select>
+<button class="primary" id="start">Start search</button>
+<button class="danger" id="stop" disabled>Stop</button>
+</div>
+</header>
+<section class="grid">
+<section class="card metrics">
+<div class="metric"><div class="label">Search stage</div><strong id="stage">0</strong><small>degree + coefficient shell</small></div>
+<div class="metric"><div class="label">Local ordinal</div><strong id="local">0</strong><small>exact candidate index</small></div>
+<div class="metric"><div class="label">Candidates examined</div><strong id="tested">0</strong><small>canonical shell candidates</small></div>
+<div class="metric"><div class="label">Jacobian = 1</div><strong id="jacobian">0</strong><small>investigations retained</small></div>
+<div class="metric"><div class="label">Collisions</div><strong id="collisions">0</strong><small>verified exact equalities</small></div>
+</section>
+<section class="card control">
+<div class="card-title"><h2>Run controls</h2><span id="elapsed">00:00:00</span></div>
+<div class="body">
+<div class="control-row"><label>Scheduling</label><span class="status running"><b></b><span>parallel dovetail</span></span></div>
+<div class="control-row"><label>Coefficient field</label><span>ℚ(i)</span></div>
+<div class="control-row"><label>Arithmetic</label><span>normalized rationals</span></div>
+<div class="control-row"><label>Collision points</label><span>ℤ[i] enumeration</span></div>
+</div>
+</section>
+<section class="card search-card">
+<div class="card-title"><h2>Mathematical target</h2><span>exact identity</span></div>
+<div class="body">
+<div class="formula"><h3>Input space</h3><code>P(x,y), Q(x,y) ∈ ℚ(i)[x,y]</code><code>J(P,Q) = PₓQᵧ − PᵧQₓ</code></div>
+<div class="formula"><h3>Collision condition</h3><code>p₁ ≠ p₂</code><code>P(p₁) = P(p₂), Q(p₁) = Q(p₂)</code></div>
+</div>
+</section>
+<section class="card latest">
+<div class="card-title"><h2>Latest exact result</h2><span id="resultMeta">awaiting search</span></div>
+<div class="latest-content" id="latest"><div class="empty"><div><strong>No candidate has been retained yet</strong>The first Jacobian-one pair will appear here with its full symbolic data.</div></div></div>
+</section>
+<section class="card stream">
+<div class="card-title"><h2>Live stream</h2><span id="connection">offline</span></div>
+<div class="stream-body"><div class="log" id="log"><div class="event">interface ready</div></div></div>
+</section>
+</section>
+<footer><span>Every displayed equality is evaluated by the Zig engine before it is published.</span><span>Port 5000 · SSE telemetry</span></footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const state={source:null,lastLatest:null};
+function formatNumber(value){return new Intl.NumberFormat("en-US").format(Number(value));}
+function addLog(message,kind=""){const row=document.createElement("div");row.className=kind;row.textContent=`[${new Date().toLocaleTimeString()}] ${message}`;$("log").prepend(row);while($("log").children.length>80)$("log").lastChild.remove();}
+function setRunning(running){$("status").classList.toggle("running",running);$("status").querySelector("span").textContent=running?"running":"stopped";$("start").disabled=running;$("stop").disabled=!running;$("workers").disabled=running;}
+function render(data){
+ $("stage").textContent=formatNumber(data.stage||0);
+ $("local").textContent=data.local||"0";
+ $("tested").textContent=formatNumber(data.tested||0);
+ $("jacobian").textContent=formatNumber(data.jacobianOne||0);
+ $("collisions").textContent=formatNumber(data.collisions||0);
+ const seconds=Number(data.elapsedSeconds||0),h=String(Math.floor(seconds/3600)).padStart(2,"0"),m=String(Math.floor(seconds%3600/60)).padStart(2,"0"),s=String(seconds%60).padStart(2,"0");
+ $("elapsed").textContent=`${h}:${m}:${s}`;
+ setRunning(Boolean(data.running));
+ if(data.latest&&JSON.stringify(data.latest)!==state.lastLatest){state.lastLatest=JSON.stringify(data.latest);renderLatest(data.latest);}
+}
+function renderLatest(value){
+ if(!value||!value.P){$("resultMeta").textContent="no retained pair";return;}
+ $("resultMeta").textContent=`stage ${value.stage??"—"} · local ${value.local??"—"}`;
+ const collision=value.collision?`<div class="formula-wide"><code>collision = ${escapeHtml(value.collision)}</code></div>`:"";
+ $("latest").innerHTML=`<div class="candidate"><div class="candidate-top"><h3>${value.collision?"Verified collision":"Jacobian-one candidate"}</h3><span>${value.collision?"exact evaluation matched":"investigation queued"}</span></div><div class="formula-wide"><code>P(x,y) = ${escapeHtml(value.P||"")}</code></div><div class="formula-wide"><code>Q(x,y) = ${escapeHtml(value.Q||"")}</code></div><div class="formula-wide"><code>J(P,Q) − 1 = ${escapeHtml(value.J||"")}</code></div>${collision}<div class="cert">${escapeHtml(value.certificate||"")}</div></div>`;
+ addLog(value.collision?"verified exact collision":"retained Jacobian-one pair",value.collision?"good":"event");
+}
+function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+async function request(path,options={}){const response=await fetch(path,options);if(!response.ok)throw new Error(`${response.status} ${response.statusText}`);return response.json();}
+function connect(){if(state.source)state.source.close();state.source=new EventSource("/events");$("connection").textContent="connected";state.source.onmessage=event=>{try{render(JSON.parse(event.data));}catch(error){addLog("telemetry parse error","warn");}};state.source.onerror=()=>{$("connection").textContent="reconnecting";};}
+$("start").addEventListener("click",async()=>{try{await request(`/api/start?workers=${$("workers").value}`,{method:"POST"});addLog(`started with ${$("workers").value} workers`,"good");connect();}catch(error){addLog(error.message,"warn");}});
+$("stop").addEventListener("click",async()=>{try{await request("/api/stop",{method:"POST"});addLog("stop requested","warn");}catch(error){addLog(error.message,"warn");}});
+request("/api/status").then(render).catch(error=>addLog(error.message,"warn"));
+setInterval(()=>{if(!state.source||state.source.readyState===2)request("/api/status").then(render).catch(()=>{});},2000);
+</script>
+</body>
+</html>
