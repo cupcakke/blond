@@ -3,150 +3,147 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Jacobian Search Engine</title>
+<meta name="theme-color" content="#0a1020">
+<title>Egzakt algebrai kereső</title>
 <style>
-:root{color-scheme:dark;--bg:#080d16;--panel:#101927;--panel2:#162335;--line:#263650;--text:#edf4ff;--muted:#8fa5c3;--blue:#55a8ff;--cyan:#58e0d0;--green:#50d890;--amber:#f6c15a;--red:#ff6f86;--shadow:0 24px 70px rgba(0,0,0,.28)}
+:root{color-scheme:dark;--bg:#080d18;--panel:#101a2b;--panel-soft:#142137;--line:#263955;--text:#eef4ff;--muted:#9aacc7;--blue:#73b4ff;--cyan:#62e0cf;--green:#68dfa0;--amber:#f1bd64;--red:#ff8295;--shadow:0 22px 64px rgba(0,0,0,.28)}
 *{box-sizing:border-box}
-html,body{margin:0;min-height:100%;background:radial-gradient(circle at 80% 0,#152c4b 0,transparent 36rem),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
-body{padding:28px}
-main{max-width:1440px;margin:0 auto}
-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:24px}
-.eyebrow{display:flex;align-items:center;gap:10px;color:var(--cyan);font:700 12px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.16em;text-transform:uppercase}
-.eyebrow i{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 18px var(--cyan)}
-h1{font-size:clamp(28px,4vw,48px);line-height:1.02;margin:14px 0 10px;letter-spacing:-.045em}
-.subtitle{max-width:760px;color:var(--muted);font-size:15px;line-height:1.65;margin:0}
-.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
-button,select{font:inherit;border:1px solid var(--line);border-radius:10px;color:var(--text);background:var(--panel2);padding:11px 16px;cursor:pointer;transition:transform .16s,border-color .16s,background .16s,opacity .16s}
-button:hover:not(:disabled),select:hover{border-color:var(--blue);background:#1d304b;transform:translateY(-1px)}
-button:disabled{cursor:not-allowed;opacity:.45}
-.primary{background:var(--blue);border-color:var(--blue);color:#06101d;font-weight:800}
-.danger{color:#ffdce2;border-color:#713347}
-.status{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:9px 13px;color:var(--muted);font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace}
-.status b{width:8px;height:8px;border-radius:50%;background:#667891}
-.status.running{border-color:#23694d;color:#9cf4c4}.status.running b{background:var(--green);box-shadow:0 0 12px var(--green)}
-.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
-.card{background:linear-gradient(145deg,rgba(22,35,53,.92),rgba(12,20,32,.94));border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);overflow:hidden}
-.card-title{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 0}
-.card-title h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:#b5c7df;margin:0}
-.card-title span{color:var(--muted);font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
-.metrics{grid-column:span 12;display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line)}
-.metric{min-height:112px;padding:20px;background:var(--panel)}
-.metric .label{color:var(--muted);font-size:12px;margin-bottom:15px}
-.metric strong{font:700 clamp(23px,3vw,34px)/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.05em}
-.metric small{display:block;margin-top:10px;color:var(--muted);font-size:11px}
-.control{grid-column:span 4;min-height:244px}
-.search-card{grid-column:span 8;min-height:244px}
-.body{padding:18px 20px 20px}
-.control-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid rgba(38,54,80,.62)}
-.control-row:last-child{border-bottom:0}
-.control-row label{color:var(--muted);font-size:13px}
-.control-row select{min-width:126px;padding:8px 11px}
-.search-card .body{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.formula{background:#0a111d;border:1px solid #1f314b;border-radius:11px;padding:15px;min-height:132px}
-.formula h3{margin:0 0 12px;color:var(--cyan);font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase}
-.formula code{display:block;color:#e1ebfb;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-word}
-.latest{grid-column:span 8;min-height:300px}
-.stream{grid-column:span 4;min-height:300px}
-.latest-content{padding:18px 20px 20px}
-.empty{display:grid;place-items:center;min-height:205px;text-align:center;color:var(--muted);border:1px dashed #2a3c58;border-radius:11px;padding:22px}
-.empty strong{display:block;color:#b9cbe2;margin-bottom:8px}
+html{min-height:100%;background:var(--bg)}
+body{margin:0;min-height:100vh;padding:30px;background:radial-gradient(ellipse at 76% 0,#193354 0,transparent 36rem),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text)}
+main{max-width:1420px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:24px}
+.eyebrow{display:flex;align-items:center;gap:10px;color:var(--cyan);font:700 11px/1.2 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.17em;text-transform:uppercase}
+.eyebrow i{width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 16px var(--cyan)}
+h1{margin:13px 0 10px;font-size:clamp(28px,4vw,48px);line-height:1.04;letter-spacing:-.045em}
+.intro{max-width:820px;margin:0;color:var(--muted);font-size:14px;line-height:1.65}
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+button{border:1px solid var(--line);border-radius:10px;padding:11px 17px;background:var(--panel-soft);color:var(--text);font:inherit;font-weight:700;font-size:13px;cursor:pointer;transition:transform .15s,border-color .15s,opacity .15s}
+button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--blue)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.primary{background:var(--blue);border-color:var(--blue);color:#081322}
+.danger{border-color:#633448;color:#ffd9e0}
+.status{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:9px 12px;color:var(--muted);font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}
+.status i{width:8px;height:8px;border-radius:50%;background:#738198}
+.status.running{border-color:#28684c;color:#b3f5cf}.status.running i{background:var(--green);box-shadow:0 0 11px var(--green)}
+.status.done{border-color:#37608d;color:#c3ddff}.status.done i{background:var(--blue);box-shadow:0 0 11px var(--blue)}
+.status.failed{border-color:#743648;color:#ffd1d9}.status.failed i{background:var(--red)}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px}
+.card{overflow:hidden;border:1px solid var(--line);border-radius:15px;background:linear-gradient(145deg,rgba(20,33,55,.96),rgba(12,20,34,.97));box-shadow:var(--shadow)}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:17px 19px 0}
+.card-head h2{margin:0;color:#c1d1e7;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+.card-head span{color:var(--muted);font:11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.metrics{grid-column:span 12;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line)}
+.metric{min-height:106px;padding:19px;background:var(--panel)}
+.metric label{display:block;margin-bottom:15px;color:var(--muted);font-size:12px}
+.metric strong{font:700 clamp(20px,3vw,31px)/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:-.045em;overflow-wrap:anywhere}
+.metric small{display:block;margin-top:9px;color:#7489a7;font-size:11px}
+.control{grid-column:span 4;min-height:250px}
+.progress{grid-column:span 8;min-height:250px}
+.body{padding:17px 19px 20px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:12px 0;border-bottom:1px solid rgba(38,57,85,.7)}
+.row:last-child{border-bottom:0}
+.row span:first-child{color:var(--muted);font-size:12px}
+.row strong{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;overflow-wrap:anywhere}
+.progress-note{margin:0 0 14px;color:var(--muted);font-size:13px;line-height:1.6}
+.math{border:1px solid #263a59;border-radius:11px;background:#09111e;padding:15px;color:#e1ebfb;font:13px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
+.math div+div{margin-top:4px}
+.result{grid-column:span 8;min-height:350px}
+.feed{grid-column:span 4;min-height:350px}
+.result-content{padding:17px 19px 20px}
+.empty{display:grid;place-items:center;min-height:260px;border:1px dashed #304663;border-radius:11px;padding:24px;text-align:center;color:var(--muted);line-height:1.65}
+.empty strong{display:block;margin-bottom:7px;color:#d7e4f5;font-size:15px}
 .candidate{display:grid;gap:12px}
-.candidate-top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-.candidate-top h3{margin:0;font-size:16px}
-.candidate-top span{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
-.formula-wide{background:#0a111d;border:1px solid #1f314b;border-radius:11px;padding:14px;overflow:auto}
-.formula-wide code{font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;color:#dce9fb;white-space:pre-wrap;word-break:break-word}
-.cert{color:var(--muted);font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-word}
-.stream-body{padding:16px 20px 20px}
-.log{height:230px;overflow:auto;background:#090f18;border-radius:11px;border:1px solid #1c2b42;padding:13px;font:11px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;color:#8fa5c3}
-.log div{padding:2px 0;border-bottom:1px solid rgba(38,54,80,.38)}
-.log .good{color:var(--green)}.log .event{color:var(--blue)}.log .warn{color:var(--amber)}
-footer{display:flex;justify-content:space-between;gap:16px;margin-top:18px;color:#607591;font-size:11px;line-height:1.5}
-@media(max-width:1000px){.control,.search-card,.latest,.stream{grid-column:span 12}.metrics{grid-template-columns:repeat(3,1fr)}header{flex-direction:column}.actions{justify-content:flex-start}}
-@media(max-width:600px){body{padding:16px}.metrics{grid-template-columns:repeat(2,1fr)}.metric:last-child{grid-column:span 2}.search-card .body{grid-template-columns:1fr}footer{flex-direction:column}.actions{width:100%}.actions button,.actions select{flex:1}}
+.candidate-title{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.candidate-title h3{margin:0;font-size:16px}
+.candidate-title span{color:var(--green);font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace}
+.result-block{border:1px solid #263a59;border-radius:11px;background:#09111e;padding:13px}
+.result-block h3{margin:0 0 10px;color:var(--cyan);font:700 10px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.13em;text-transform:uppercase}
+.result-block pre{margin:0;color:#dce8f8;font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+details.result-block summary{color:#dce8f8;font:700 11px ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer}
+details.result-block pre{margin-top:12px}
+.checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.check{border:1px solid #24553f;border-radius:9px;background:#0c201b;padding:10px;color:#b8f1d0;font:600 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+.log{height:290px;overflow:auto;border:1px solid #21334e;border-radius:10px;background:#080f1a;padding:12px;color:#9aacc7;font:11px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}
+.log div{padding:3px 0;border-bottom:1px solid rgba(38,57,85,.4);overflow-wrap:anywhere}
+.log .ok{color:var(--green)}.log .warn{color:var(--amber)}.log .bad{color:var(--red)}
+footer{display:flex;justify-content:space-between;gap:16px;margin-top:16px;color:#7387a3;font-size:11px;line-height:1.5}
+@media(max-width:960px){.control,.progress,.result,.feed{grid-column:span 12}header{flex-direction:column}.actions{width:100%}}
+@media(max-width:620px){body{padding:16px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.metric{min-height:96px;padding:15px}.actions button{flex:1}.checks{grid-template-columns:1fr}footer{flex-direction:column}}
 </style>
 </head>
 <body>
 <main>
 <header>
 <section>
-<div class="eyebrow"><i></i> Exact algebraic computation</div>
-<h1>Jacobian collision search</h1>
-<p class="subtitle">Párhuzamos, fair-dovetailing keresés növekvő fokszámmal és együttható-komplexitással. A motor egzakt Gauss-racionális aritmetikát, Jacobian-ellenőrzést, közvetlen pontenumerációt és eliminációs tanúsítványt használ.</p>
+<div class="eyebrow"><i></i> Egzakt, teljes felsorolás</div>
+<h1>Algebrai kollíziókereső</h1>
+<p class="intro">A kereső lépcsőnként sorolja fel a monikus racionális modulusokat, a polinomokat és a pontadatokat. Az aritmetika tetszőleges pontosságú racionális számokkal, a hányadosgyűrűben történik. Eredmény csak mind a négy pontos azonosság ellenőrzése után jelenik meg. Ez a kétváltozós Jacobi-sejtés ellenpéldáját keresi; a futás korlátlan lehet, és a véges idejű találathiány nem bizonyítás.</p>
 </section>
 <div class="actions">
-<span class="status" id="status"><b></b><span>stopped</span></span>
-<select id="workers" aria-label="Worker count"><option value="1">1 worker</option><option value="2">2 workers</option><option value="4" selected>4 workers</option><option value="8">8 workers</option><option value="16">16 workers</option></select>
-<button class="primary" id="start">Start search</button>
-<button class="danger" id="stop" disabled>Stop</button>
+<span class="status" id="status"><i></i><span>Leállítva</span></span>
+<button class="primary" id="start">Keresés indítása</button>
+<button class="danger" id="stop" disabled>Leállítás</button>
 </div>
 </header>
 <section class="grid">
 <section class="card metrics">
-<div class="metric"><div class="label">Search stage</div><strong id="stage">0</strong><small>degree + coefficient shell</small></div>
-<div class="metric"><div class="label">Local ordinal</div><strong id="local">0</strong><small>exact candidate index</small></div>
-<div class="metric"><div class="label">Candidates examined</div><strong id="tested">0</strong><small>canonical shell candidates</small></div>
-<div class="metric"><div class="label">Jacobian = 1</div><strong id="jacobian">0</strong><small>investigations retained</small></div>
-<div class="metric"><div class="label">Collisions</div><strong id="collisions">0</strong><small>verified exact equalities</small></div>
+<div class="metric"><label>Keresési lépcső</label><strong id="stage">0</strong><small>növekvő s sorrendben</small></div>
+<div class="metric"><label>Globális jelöltindex</label><strong id="global">0</strong><small>minden kiosztott jelölt egyedi</small></div>
+<div class="metric"><label>Lépcsőn belüli index</label><strong id="local">0</strong><small>gyenge kompozíciók sorrendje</small></div>
+<div class="metric"><label>Kiértékelt jelöltek</label><strong id="tested">0</strong><small>egzakt aritmetikával feldolgozva</small></div>
 </section>
 <section class="card control">
-<div class="card-title"><h2>Run controls</h2><span id="elapsed">00:00:00</span></div>
+<div class="card-head"><h2>Futtatás</h2><span id="elapsed">00:00:00</span></div>
 <div class="body">
-<div class="control-row"><label>Scheduling</label><span class="status running"><b></b><span>parallel dovetail</span></span></div>
-<div class="control-row"><label>Coefficient field</label><span>ℚ(i)</span></div>
-<div class="control-row"><label>Arithmetic</label><span>normalized rationals</span></div>
-<div class="control-row"><label>Collision points</label><span>ℤ² enumeration</span></div>
+<div class="row"><span>Felsorolás</span><strong>méltányos, állapottartó</strong></div>
+<div class="row"><span>Alapgyűrű</span><strong>ℚ[T]/(h)</strong></div>
+<div class="row"><span>Egész aritmetika</span><strong>tetszőleges pontosság</strong></div>
+<div class="row"><span>Gyök kiválasztása</span><strong>lexikografikus minimum</strong></div>
 </div>
 </section>
-<section class="card search-card">
-<div class="card-title"><h2>Mathematical target</h2><span>exact identity</span></div>
+<section class="card progress">
+<div class="card-head"><h2>Elfogadási feltételek</h2><span>pontos maradékazonosságok</span></div>
 <div class="body">
-<div class="formula"><h3>Input space</h3><code>P(x,y), Q(x,y) ∈ ℚ(i)[x,y]</code><code>J(P,Q) = PₓQᵧ − PᵧQₓ</code></div>
-<div class="formula"><h3>Collision condition</h3><code>p₁ ≠ p₂</code><code>P(p₁) = P(p₂), Q(p₁) = Q(p₂)</code></div>
+<p class="progress-note">A kereső az első nem nulla maradéknál elveti az adott tanúsítványt. Numerikus gyökkeresést nem használ; az eredményben α a modulus különböző komplex gyökei közül a lexikografikusan legkisebb.</p>
+<div class="math">
+<div>u(x₁−x₂) + v(y₁−y₂) − 1 = 0</div>
+<div>PₓQᵧ − PᵧQₓ − 1 = 0 az R[x,y] gyűrűben</div>
+<div>P(x₁,y₁) − P(x₂,y₂) = 0 az R gyűrűben</div>
+<div>Q(x₁,y₁) − Q(x₂,y₂) = 0 az R gyűrűben</div>
+</div>
 </div>
 </section>
-<section class="card latest">
-<div class="card-title"><h2>Latest exact result</h2><span id="resultMeta">awaiting search</span></div>
-<div class="latest-content" id="latest"><div class="empty"><div><strong>No candidate has been retained yet</strong>The first Jacobian-one pair will appear here with its full symbolic data.</div></div></div>
+<section class="card result">
+<div class="card-head"><h2>Igazolt tanúsítvány</h2><span id="result-meta">még nincs találat</span></div>
+<div class="result-content" id="result">
+<div class="empty"><div><strong>A teljes keresés futtatható</strong>A megjelenített állapot valódi jelölteket és egzakt ellenőrzéseket tükröz. Nincs előre betöltött vagy szimulált találat.</div></div>
+</div>
 </section>
-<section class="card stream">
-<div class="card-title"><h2>Live stream</h2><span id="connection">offline</span></div>
-<div class="stream-body"><div class="log" id="log"><div class="event">interface ready</div></div></div>
+<section class="card feed">
+<div class="card-head"><h2>Élő állapot</h2><span id="connection">kapcsolódás…</span></div>
+<div class="body"><div class="log" id="log"><div>Az állapotlekérés indul.</div></div></div>
 </section>
 </section>
-<footer><span>Every displayed equality is evaluated by the Zig engine before it is published.</span><span>Port 5000 · SSE telemetry</span></footer>
+<footer><span>A globális jelöltindex és a lépcsőszám tetszőleges pontosságú egész.</span><span>Az ellenőrzés az összes komplex gyökre érvényes.</span></footer>
 </main>
 <script>
 const $=id=>document.getElementById(id);
-const state={source:null,lastLatest:null};
-function formatNumber(value){return new Intl.NumberFormat("en-US").format(Number(value));}
-function addLog(message,kind=""){const row=document.createElement("div");row.className=kind;row.textContent=`[${new Date().toLocaleTimeString()}] ${message}`;$("log").prepend(row);while($("log").children.length>80)$("log").lastChild.remove();}
-function setRunning(running){$("status").classList.toggle("running",running);$("status").querySelector("span").textContent=running?"running":"stopped";$("start").disabled=running;$("stop").disabled=!running;$("workers").disabled=running;}
-function render(data){
- $("stage").textContent=formatNumber(data.stage||0);
- $("local").textContent=data.local||"0";
- $("tested").textContent=formatNumber(data.tested||0);
- $("jacobian").textContent=formatNumber(data.jacobianOne||0);
- $("collisions").textContent=formatNumber(data.collisions||0);
- const seconds=Number(data.elapsedSeconds||0),h=String(Math.floor(seconds/3600)).padStart(2,"0"),m=String(Math.floor(seconds%3600/60)).padStart(2,"0"),s=String(seconds%60).padStart(2,"0");
- $("elapsed").textContent=`${h}:${m}:${s}`;
- setRunning(Boolean(data.running));
- if(data.latest&&JSON.stringify(data.latest)!==state.lastLatest){state.lastLatest=JSON.stringify(data.latest);renderLatest(data.latest);}
-}
-function renderLatest(value){
- if(!value||!value.P){$("resultMeta").textContent="no retained pair";return;}
- $("resultMeta").textContent=`stage ${value.stage??"—"} · local ${value.local??"—"}`;
- const collision=value.collision?`<div class="formula-wide"><code>p₁ ≠ p₂ and P(p₁)=P(p₂), Q(p₁)=Q(p₂)<br>${escapeHtml(JSON.stringify(value.collision))}</code></div>`:"";
- $("latest").innerHTML=`<div class="candidate"><div class="candidate-top"><h3>${value.collision?"Verified collision":"Jacobian-one candidate"}</h3><span>${value.collision?"exact evaluation matched":"investigation queued"}</span></div><div class="formula-wide"><code>P(x,y) = ${escapeHtml(value.P||"")}</code><code>Q(x,y) = ${escapeHtml(value.Q||"")}</code></div><div class="formula-wide"><code>Pₓ = ${escapeHtml(value.Px||"0")}</code><code>Pᵧ = ${escapeHtml(value.Py||"0")}</code><code>Qₓ = ${escapeHtml(value.Qx||"0")}</code><code>Qᵧ = ${escapeHtml(value.Qy||"0")}</code></div><div class="formula-wide"><code>J(P,Q) − 1 = ${escapeHtml(value.JminusOne||"")}</code><code>J(P,Q) = ${escapeHtml(value.J||"")}</code></div>${collision}<div class="cert">${escapeHtml(value.certificate||"")}</div></div>`;
- addLog(value.collision?"verified exact collision":"retained Jacobian-one pair",value.collision?"good":"event");
-}
-function escapeHtml(value){return String(value).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+const state={source:null,lastLatest:null,lastRunning:false,lastFailure:""};
+function log(message,kind=""){const row=document.createElement("div");row.className=kind;row.textContent=`[${new Date().toLocaleTimeString()}] ${message}`;$("log").prepend(row);while($("log").children.length>80)$("log").lastChild.remove();}
+function setRunning(running,completed,failure){const status=$("status");status.classList.toggle("running",running);status.classList.toggle("done",completed&&!running);status.classList.toggle("failed",Boolean(failure));status.querySelector("span").textContent=failure?"Hiba":running?"Fut":"Találat";if(!failure&&!running&&!completed)status.querySelector("span").textContent="Leállítva";$("start").disabled=running;$("stop").disabled=!running;}
+function formatElapsed(value){const seconds=Number(value||0),h=String(Math.floor(seconds/3600)).padStart(2,"0"),m=String(Math.floor(seconds%3600/60)).padStart(2,"0"),s=String(seconds%60).padStart(2,"0");return `${h}:${m}:${s}`;}
+function render(data){$("stage").textContent=data.stage||"0";$("global").textContent=data.globalIndex||"0";$("local").textContent=data.localIndex||"0";$("tested").textContent=data.tested||"0";$("elapsed").textContent=formatElapsed(data.elapsedSeconds);const failure=data.failed?(data.failure||"ismeretlen hiba"):"";setRunning(Boolean(data.running),Boolean(data.completed),failure);if(data.running!==state.lastRunning){log(data.running?"A méltányos keresés elindult.":data.completed?"Egzakt tanúsítvány elfogadva.":data.failed?"A keresés hibával leállt.":"A keresés leállt.",data.failed?"bad":data.completed?"ok":"");state.lastRunning=data.running;}if(failure&&failure!==state.lastFailure){state.lastFailure=failure;log(`A keresés erőforrás- vagy futási hibával leállt: ${failure}`,"bad");}if(data.latest&&JSON.stringify(data.latest)!==state.lastLatest){state.lastLatest=JSON.stringify(data.latest);renderResult(data.latest);}}
+function elementText(values){const terms=[];for(let i=0;i<values.length;i++){const value=values[i];if(value==="0")continue;const monomial=i===0?"":i===1?"α":`α^${i}`;terms.push(monomial?`${value}·${monomial}`:value);}return terms.length?terms.join(" + "):"0";}
+function polyText(terms){if(!terms.length)return"0";return terms.map(term=>{const coefficient=elementText(term.coefficient),variables=[];if(term.x)variables.push(term.x===1?"x":`x^${term.x}`);if(term.y)variables.push(term.y===1?"y":`y^${term.y}`);return variables.length?`(${coefficient})·${variables.join("")}`:coefficient;}).join(" + ");}
+function formatPoint(point){return `(${elementText(point[0])}, ${elementText(point[1])})`;}
+function block(title,text){const section=document.createElement("section");section.className="result-block";const heading=document.createElement("h3");heading.textContent=title;const pre=document.createElement("pre");pre.textContent=text;section.append(heading,pre);return section;}
+function detail(title,text){const section=document.createElement("details");section.className="result-block";const summary=document.createElement("summary");summary.textContent=title;const pre=document.createElement("pre");pre.textContent=text;section.append(summary,pre);return section;}
+function renderResult(value){$("result-meta").textContent=`s=${value.stage} · k=${value.index}`;const root=document.createElement("div");root.className="candidate";const top=document.createElement("div");top.className="candidate-title";const heading=document.createElement("h3");heading.textContent="Minden feltétel egzaktul teljesült";const badge=document.createElement("span");badge.textContent="ELFOGADVA";top.append(heading,badge);root.append(top);root.append(detail("Teljes nyers jelölt és globális index",JSON.stringify({stage:value.stage,index:value.index,localIndex:value.localIndex,degree:value.degree,modulusDegree:value.modulusDegree,codes:value.codes},null,2)));const h=value.modulus.map((coefficient,i)=>`(${coefficient})${i===0?"":`·T${i===1?"":`^${i}`}`}`).join(" + ")+" + T^"+value.modulus.length;root.append(block("Monikus modulus h(T)",h));root.append(block("Kiválasztott algebrai szám α",value.rootSelector));root.append(block("P(x,y)",polyText(value.P)));root.append(block("Q(x,y)",polyText(value.Q)));root.append(block("Különböző pontok",`p₁ = ${formatPoint(value.p1)}\np₂ = ${formatPoint(value.p2)}`));root.append(block("Gyűrűbeli skalárok",`u = ${elementText(value.u)}\nv = ${elementText(value.v)}`));const checks=document.createElement("section");checks.className="result-block";const checksTitle=document.createElement("h3");checksTitle.textContent="Ellenőrzött maradékok";const grid=document.createElement("div");grid.className="checks";for(const [label,residual] of Object.entries(value.checks)){const item=document.createElement("div");item.className="check";item.textContent=`${label}: ${residual}`;grid.append(item);}checks.append(checksTitle,grid);root.append(checks);$("result").replaceChildren(root);log(`Elfogadott tanúsítvány: k=${value.index}, s=${value.stage}.`,"ok");}
 async function request(path,options={}){const response=await fetch(path,options);if(!response.ok)throw new Error(`${response.status} ${response.statusText}`);return response.json();}
-function connect(){if(state.source)state.source.close();state.source=new EventSource("/events");$("connection").textContent="connected";state.source.onmessage=event=>{try{render(JSON.parse(event.data));}catch(error){addLog("telemetry parse error","warn");}};state.source.onerror=()=>{$("connection").textContent="reconnecting";};}
-$("start").addEventListener("click",async()=>{try{await request(`/api/start?workers=${$("workers").value}`,{method:"POST"});addLog(`started with ${$("workers").value} workers`,"good");connect();}catch(error){addLog(error.message,"warn");}});
-$("stop").addEventListener("click",async()=>{try{await request("/api/stop",{method:"POST"});addLog("stop requested","warn");}catch(error){addLog(error.message,"warn");}});
-request("/api/status").then(render).catch(error=>addLog(error.message,"warn"));
-setInterval(()=>{if(!state.source||state.source.readyState===2)request("/api/status").then(render).catch(()=>{});},2000);
+function connect(){if(state.source)state.source.close();state.source=new EventSource("/events");$("connection").textContent="élő";state.source.onmessage=event=>{try{render(JSON.parse(event.data));}catch(error){log(`Állapotfeldolgozási hiba: ${error.message}`,"bad");}};state.source.onerror=()=>{$("connection").textContent="újracsatlakozás";};}
+$("start").addEventListener("click",async()=>{try{render(await request("/api/start",{method:"POST"}));connect();}catch(error){log(`Indítási hiba: ${error.message}`,"bad");}});
+$("stop").addEventListener("click",async()=>{try{render(await request("/api/stop",{method:"POST"}));}catch(error){log(`Leállítási hiba: ${error.message}`,"bad");}});
+request("/api/status").then(data=>{render(data);connect();}).catch(error=>log(`Kapcsolati hiba: ${error.message}`,"bad"));
 </script>
 </body>
 </html>
