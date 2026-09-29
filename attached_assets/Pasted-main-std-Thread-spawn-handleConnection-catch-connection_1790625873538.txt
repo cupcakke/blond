@@ -1,38 +1,33 @@
+main — _ = std.Thread.spawn(.{}, handleConnection, .{...}) catch connection.stream.close();] — compile error: catch peer types are std.Thread and void (Stream.close returns void, not noreturn); incompatible types.
+[main — same statement] — resource leak: the spawned connection thread is neither detach()ed nor joined; one thread handle leaks per accepted connection.
+[worker — if (state.takeInvestigation()) |job| { investigate(...) catch {}; continue; }] — logic error: once investigations is non-empty, takeInvestigation never returns null, so every worker spins on investigations forever and nextWork is never called again; the search permanently stalls after the first J≡1 candidate (reached at stage 2, e.g. P=x, Q=y).
+[investigate — job.radius += 1, job.first = 0, job.first += 1] — data race: takeInvestigation hands the same *Investigation to multiple workers round-robin and these fields are mutated with no lock or atomics (undefined behaviour; point pairs skipped/duplicated).
+[investigate — const pt = try std.fmt.allocPrint(state.allocator, ...)] — memory leak: pt is never freed.
+[candidateJson — var px = try p.derivativeX(); … var qy = try q.derivativeY();] — memory leak: the four derivative polys are never deinited; when called from investigate, job.p/job.q are backed by state.allocator (GPA), so this leaks on every collision.
+[groebnerBasis — while (i < basis.items.len) / var k = i + 1] — logic error: a basis element appended while i > 0 is never paired with indices < i; the Buchberger pair set is incomplete, so the returned set may not be a Gröbner basis and the certificate text can be wrong.
+[Complex.text — "{s}+{s}i"] — logic error: a negative imaginary part prints as a+-bi.
+[parseWorkers — value = value * 10 + path[i] - '0'] — runtime error: u32 overflow panic (Debug/ReleaseSafe) on a client-supplied workers= value of ≥10 digits.
+[Rat.add / Rat.sub / Rat.mul / Rat.div — a.n * b.d, a.d * b.d, a.n * b.n, a.d * b.n] — runtime error: unchecked i128 multiplication; coefficient growth in groebnerBasis/reduceByBasis/determinant can overflow → panic (safe modes) or silent wrap.
+[SearchState.nextWork — const degree = self.stage / 2; const height = self.stage - degree;] — logic error / ambiguity: the stage map only visits (degree, height) pairs with height ∈ {degree, degree+1}; combined with the exact-match filter in worker (actual_degree != degree or actual_height != height), candidates such as (0, 2) or (2, 1) are never enumerated.
+[main — @embedFile("index.html")] — ambiguity / broken reference: the file is not part of the submitted source; compilation fails if it is absent.
+[whole file — std.net.StreamServer, std.ArrayList(T).init, std.time.sleep, never-mutated vars such as var px/var py/var qx/var qy in jacobian] — ambiguity: no target version is stated; the code compiles only against Zig 0.11 — on 0.12+ StreamServer no longer exists and the never-mutated vars are compile errors; on 0.15 the managed ArrayList.init and std.time.sleep are gone.
+[worker — const stable_certificate = state.allocator.dupe(u8, certificate) catch continue;] — error-path memory leak: stable_p and stable_q (GPA-backed) are leaked if the dupe fails.
+[Poly.text — var out = std.ArrayList(u8).init(allocator);] — error-path memory leak: no errdefer out.deinit(); out leaks on any failing try (called with the GPA from candidateJson).
+[statusBody — var out = std.ArrayList(u8).init(allocator);] — error-path memory leak: no errdefer out.deinit(); out leaks if snapshot fails.
+END OF ERROR LIST.
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 const Index = struct { x: u32, y: u32 };
 const Point = struct { x: i128, y: i128 };
 
-fn checkedAdd(a: i128, b: i128) i128 {
-    const result = @addWithOverflow(a, b);
-    if (result[1] != 0) @panic("exact integer overflow");
-    return result[0];
-}
-
-fn checkedSub(a: i128, b: i128) i128 {
-    const result = @subWithOverflow(a, b);
-    if (result[1] != 0) @panic("exact integer overflow");
-    return result[0];
-}
-
-fn checkedMul(a: i128, b: i128) i128 {
-    const result = @mulWithOverflow(a, b);
-    if (result[1] != 0) @panic("exact integer overflow");
-    return result[0];
-}
-
-fn checkedNeg(a: i128) i128 {
-    return checkedSub(0, a);
-}
-
 const Rat = struct {
     n: i128,
     d: i128,
 
     fn gcd(a0: i128, b0: i128) i128 {
-        var a = if (a0 < 0) checkedNeg(a0) else a0;
-        var b = if (b0 < 0) checkedNeg(b0) else b0;
+        var a = if (a0 < 0) -a0 else a0;
+        var b = if (b0 < 0) -b0 else b0;
         while (b != 0) {
             const t = @mod(a, b);
             a = b;
@@ -46,8 +41,8 @@ const Rat = struct {
         var n = n0;
         var d = d0;
         if (d < 0) {
-            n = checkedNeg(n);
-            d = checkedNeg(d);
+            n = -n;
+            d = -d;
         }
         const g = gcd(n, d);
         return .{ .n = @divTrunc(n, g), .d = @divTrunc(d, g) };
@@ -62,24 +57,23 @@ const Rat = struct {
     }
 
     fn neg(a: Rat) Rat {
-        return init(checkedNeg(a.n), a.d);
+        return init(-a.n, a.d);
     }
 
     fn add(a: Rat, b: Rat) Rat {
-        return init(checkedAdd(checkedMul(a.n, b.d), checkedMul(b.n, a.d)), checkedMul(a.d, b.d));
+        return init(a.n * b.d + b.n * a.d, a.d * b.d);
     }
 
     fn sub(a: Rat, b: Rat) Rat {
-        return init(checkedSub(checkedMul(a.n, b.d), checkedMul(b.n, a.d)), checkedMul(a.d, b.d));
+        return init(a.n * b.d - b.n * a.d, a.d * b.d);
     }
 
     fn mul(a: Rat, b: Rat) Rat {
-        return init(checkedMul(a.n, b.n), checkedMul(a.d, b.d));
+        return init(a.n * b.n, a.d * b.d);
     }
 
     fn div(a: Rat, b: Rat) Rat {
-        if (b.n == 0) @panic("division by zero");
-        return init(checkedMul(a.n, b.d), checkedMul(a.d, b.n));
+        return init(a.n * b.d, a.d * b.n);
     }
 
     fn equal(a: Rat, b: Rat) bool {
@@ -150,7 +144,6 @@ const Complex = struct {
         if (a.re.isZero()) return std.fmt.allocPrint(allocator, "{s}i", .{im});
         const re = try a.re.text(allocator);
         defer allocator.free(re);
-        if (a.im.n < 0) return std.fmt.allocPrint(allocator, "{s}{s}i", .{ re, im });
         return std.fmt.allocPrint(allocator, "{s}+{s}i", .{ re, im });
     }
 };
@@ -292,7 +285,6 @@ const Poly = struct {
 
     fn text(self: *const Poly, allocator: Allocator) ![]u8 {
         var out = std.ArrayList(u8).init(allocator);
-        errdefer out.deinit();
         if (self.terms.items.len == 0) {
             try out.append('0');
             return out.toOwnedSlice();
@@ -346,12 +338,12 @@ fn constantPoly(allocator: Allocator, value: Complex) !Poly {
 }
 
 fn jacobian(p: *const Poly, q: *const Poly) !Poly {
-    const px = try p.derivativeX();
-    const py = try p.derivativeY();
-    const qx = try q.derivativeX();
-    const qy = try q.derivativeY();
-    const left = try px.multiply(&qy);
-    const right = try py.multiply(&qx);
+    var px = try p.derivativeX();
+    var py = try p.derivativeY();
+    var qx = try q.derivativeX();
+    var qy = try q.derivativeY();
+    var left = try px.multiply(&qy);
+    var right = try py.multiply(&qx);
     var result = try left.sub(&right);
     try result.addTerm(.{ .x = 0, .y = 0 }, Complex.neg(Complex.one()));
     return result;
