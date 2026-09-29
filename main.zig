@@ -435,6 +435,7 @@ fn buildCandidate(allocator: Allocator, degree: u64, height: u64, ordinal: u128)
 
 const Investigation = struct {
     allocator: Allocator,
+    mutex: std.Thread.Mutex = .{},
     p: Poly,
     q: Poly,
     stage: u64,
@@ -463,6 +464,7 @@ const SearchState = struct {
     collisions: u64 = 0,
     workers: u32 = 0,
     next_investigation: usize = 0,
+    dispatch_counter: u64 = 0,
     investigations: std.ArrayList(*Investigation),
     latest: []u8,
     started_ns: i128 = 0,
@@ -531,12 +533,13 @@ const SearchState = struct {
     fn nextWork(self: *SearchState) struct { stage: u64, local: u128 } {
         self.mutex.lock();
         defer self.mutex.unlock();
-        const degree = self.stage / 2;
-        const height = self.stage - degree;
-        const count = candidateCount(degree, height);
+        var pair = pairForStage(self.stage);
+        var count = candidateCount(pair.degree, pair.height);
         if (self.local >= count) {
             self.stage += 1;
             self.local = 0;
+            pair = pairForStage(self.stage);
+            count = candidateCount(pair.degree, pair.height);
         }
         const result = .{ .stage = self.stage, .local = self.local };
         self.local += 1;
@@ -555,11 +558,27 @@ const SearchState = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
         if (self.investigations.items.len == 0) return null;
+        self.dispatch_counter += 1;
+        if (self.dispatch_counter % 4 != 0) return null;
         const job = self.investigations.items[self.next_investigation % self.investigations.items.len];
         self.next_investigation = (self.next_investigation + 1) % self.investigations.items.len;
         return job;
     }
 };
+
+fn pairForStage(stage: u64) struct { degree: u64, height: u64 } {
+    var diagonal: u64 = 0;
+    var first: u64 = 0;
+    while (true) {
+        const length = diagonal + 1;
+        if (stage < first + length) {
+            const degree = stage - first;
+            return .{ .degree = degree, .height = diagonal - degree };
+        }
+        first += length;
+        diagonal += 1;
+    }
+}
 
 fn pointAt(index: u128) Point {
     if (index == 0) return .{ .x = 0, .y = 0 };
@@ -653,31 +672,39 @@ fn groebnerBasis(allocator: Allocator, first: *const Poly, second: *const Poly) 
     var basis = std.ArrayList(Poly).init(allocator);
     try basis.append(try first.cloneInto(allocator));
     try basis.append(try second.cloneInto(allocator));
-    var i: usize = 0;
-    while (i < basis.items.len) : (i += 1) {
-        var k = i + 1;
-        while (k < basis.items.len) : (k += 1) {
-            const left = basis.items[i].leading() orelse continue;
-            const right = basis.items[k].leading() orelse continue;
-            const lcm = Index{
-                .x = @max(left.index.x, right.index.x),
-                .y = @max(left.index.y, right.index.y),
-            };
-            var left_multiplier = Poly.init(allocator);
-            var right_multiplier = Poly.init(allocator);
-            try left_multiplier.addTerm(.{
-                .x = lcm.x - left.index.x,
-                .y = lcm.y - left.index.y,
-            }, Complex.div(Complex.one(), left.value));
-            try right_multiplier.addTerm(.{
-                .x = lcm.x - right.index.x,
-                .y = lcm.y - right.index.y,
-            }, Complex.div(Complex.one(), right.value));
-            var left_product = try basis.items[i].multiply(&left_multiplier);
-            var right_product = try basis.items[k].multiply(&right_multiplier);
-            var s_polynomial = try left_product.sub(&right_product);
-            var reduced = try reduceByBasis(allocator, &s_polynomial, basis.items);
-            if (!allZero(&reduced)) try basis.append(reduced);
+    const Pair = struct { left: usize, right: usize };
+    var pairs = std.ArrayList(Pair).init(allocator);
+    try pairs.append(.{ .left = 0, .right = 1 });
+    var cursor: usize = 0;
+    while (cursor < pairs.items.len) : (cursor += 1) {
+        const pair = pairs.items[cursor];
+        const left = basis.items[pair.left].leading() orelse continue;
+        const right = basis.items[pair.right].leading() orelse continue;
+        const lcm = Index{
+            .x = @max(left.index.x, right.index.x),
+            .y = @max(left.index.y, right.index.y),
+        };
+        var left_multiplier = Poly.init(allocator);
+        var right_multiplier = Poly.init(allocator);
+        try left_multiplier.addTerm(.{
+            .x = lcm.x - left.index.x,
+            .y = lcm.y - left.index.y,
+        }, Complex.div(Complex.one(), left.value));
+        try right_multiplier.addTerm(.{
+            .x = lcm.x - right.index.x,
+            .y = lcm.y - right.index.y,
+        }, Complex.div(Complex.one(), right.value));
+        const left_product = try basis.items[pair.left].multiply(&left_multiplier);
+        const right_product = try basis.items[pair.right].multiply(&right_multiplier);
+        const s_polynomial = try left_product.sub(&right_product);
+        const reduced = try reduceByBasis(allocator, &s_polynomial, basis.items);
+        if (!allZero(&reduced)) {
+            const new_index = basis.items.len;
+            try basis.append(reduced);
+            var i: usize = 0;
+            while (i < new_index) : (i += 1) {
+                try pairs.append(.{ .left = i, .right = new_index });
+            }
         }
     }
     return basis;
@@ -685,6 +712,7 @@ fn groebnerBasis(allocator: Allocator, first: *const Poly, second: *const Poly) 
 
 fn basisText(allocator: Allocator, basis: []const Poly) ![]u8 {
     var out = std.ArrayList(u8).init(allocator);
+    errdefer out.deinit();
     try out.append('[');
     for (basis, 0..) |*poly, i| {
         if (i != 0) try out.appendSlice(", ");
@@ -802,9 +830,13 @@ fn candidateJson(state: *SearchState, stage: u64, local: u128, p: *const Poly, q
     const text_q = try q.text(state.allocator);
     defer state.allocator.free(text_q);
     var px = try p.derivativeX();
+    defer px.deinit();
     var py = try p.derivativeY();
+    defer py.deinit();
     var qx = try q.derivativeX();
+    defer qx.deinit();
     var qy = try q.derivativeY();
+    defer qy.deinit();
     const text_px = try px.text(state.allocator);
     defer state.allocator.free(text_px);
     const text_py = try py.text(state.allocator);
@@ -830,6 +862,8 @@ fn updateCandidate(state: *SearchState, stage: u64, local: u128, p: *const Poly,
 }
 
 fn investigate(state: *SearchState, job: *Investigation) !void {
+    job.mutex.lock();
+    defer job.mutex.unlock();
     const r = job.radius;
     const side = r * 2 + 1;
     const count = @as(u128, side) * @as(u128, side);
@@ -845,6 +879,7 @@ fn investigate(state: *SearchState, job: *Investigation) !void {
     const b = pointAt(right_index);
     if (!verifyPointPair(&job.p, &job.q, a, b)) return;
     const pt = try std.fmt.allocPrint(state.allocator, "{{\"x1\":\"{}\",\"y1\":\"{}\",\"x2\":\"{}\",\"y2\":\"{}\"}}", .{ a.x, a.y, b.x, b.y });
+    defer state.allocator.free(pt);
     state.mutex.lock();
     state.collisions += 1;
     state.mutex.unlock();
@@ -862,8 +897,9 @@ fn worker(state: *SearchState) void {
         const work = state.nextWork();
         var arena = std.heap.ArenaAllocator.init(state.allocator);
         const allocator = arena.allocator();
-        const degree = work.stage / 2;
-        const height = work.stage - degree;
+        const pair = pairForStage(work.stage);
+        const degree = pair.degree;
+        const height = pair.height;
         var candidate = buildCandidate(allocator, degree, height, work.local) catch {
             arena.deinit();
             continue;
@@ -886,7 +922,13 @@ fn worker(state: *SearchState) void {
             pp.deinit();
             continue;
         };
-        const stable_certificate = state.allocator.dupe(u8, certificate) catch continue;
+        const stable_certificate = state.allocator.dupe(u8, certificate) catch {
+            var pp = stable_p;
+            var qq = stable_q;
+            pp.deinit();
+            qq.deinit();
+            continue;
+        };
         state.register(work.stage, work.local, stable_p, stable_q, stable_certificate) catch {
             var pp = stable_p;
             var qq = stable_q;
@@ -922,6 +964,7 @@ fn sendResponse(stream: std.net.Stream, status: []const u8, content_type: []cons
 
 fn statusBody(state: *SearchState, allocator: Allocator) ![]u8 {
     var out = std.ArrayList(u8).init(allocator);
+    errdefer out.deinit();
     try state.snapshot(out.writer());
     return out.toOwnedSlice();
 }
@@ -931,7 +974,11 @@ fn parseWorkers(path: []const u8) u32 {
     const start = std.mem.indexOf(u8, path, marker) orelse return 4;
     var value: u32 = 0;
     var i = start + marker.len;
-    while (i < path.len and path[i] >= '0' and path[i] <= '9') : (i += 1) value = value * 10 + path[i] - '0';
+    while (i < path.len and path[i] >= '0' and path[i] <= '9') : (i += 1) {
+        const digit: u32 = path[i] - '0';
+        if (value > (std.math.maxInt(u32) - digit) / 10) return 16;
+        value = value * 10 + digit;
+    }
     return std.math.clamp(value, 1, 16);
 }
 
@@ -1033,6 +1080,10 @@ pub fn main() !void {
     try server.listen(try std.net.Address.parseIp4("0.0.0.0", 5000));
     while (true) {
         const connection = try server.accept();
-        _ = std.Thread.spawn(.{}, handleConnection, .{ connection.stream, &state, page }) catch connection.stream.close();
+        const thread = std.Thread.spawn(.{}, handleConnection, .{ connection.stream, &state, page }) catch {
+            connection.stream.close();
+            continue;
+        };
+        thread.detach();
     }
 }
