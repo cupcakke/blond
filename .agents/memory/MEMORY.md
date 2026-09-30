@@ -1,0 +1,1 @@
+- [Zig big-integer zero semantics](zig-big-integer-zero.md) — `Managed.order` can distinguish intermediate signed zeros that `eqlZero` treats as equal.

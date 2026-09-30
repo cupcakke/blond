@@ -37,7 +37,9 @@ pub const Polynomial = struct {
 
     pub fn addTerm(self: *Polynomial, index: Index, value: Element) !void {
         if (elementIsZero(value)) return;
-        for (self.terms.items, 0..) |term, i| {
+        var i: usize = 0;
+        while (i < self.terms.items.len) : (i += 1) {
+            const term = self.terms.items[i];
             if (term.index.x == index.x and term.index.y == index.y) {
                 const next = try elementAdd(self.allocator, self.modulus, term.value, value);
                 if (elementIsZero(next)) {
@@ -236,8 +238,9 @@ pub fn elementIsZero(value: Element) bool {
 
 pub fn elementEqual(a: Element, b: Element) bool {
     if (a.values.len != b.values.len) return false;
-    for (a.values, b.values) |left, right| {
-        if (!rationalEqual(left, right)) return false;
+    var i: usize = 0;
+    while (i < a.values.len) : (i += 1) {
+        if (!rationalEqual(a.values[i], b.values[i])) return false;
     }
     return true;
 }
@@ -245,13 +248,19 @@ pub fn elementEqual(a: Element, b: Element) bool {
 pub fn elementAdd(allocator: Allocator, modulus: []const Rational, a: Element, b: Element) !Element {
     const degree = modulus.len;
     const result = try allocator.alloc(Rational, degree);
-    for (result, 0..) |*value, i| value.* = try rationalAdd(allocator, a.values[i], b.values[i]);
+    var i: usize = 0;
+    while (i < result.len) : (i += 1) {
+        result[i] = try rationalAdd(allocator, a.values[i], b.values[i]);
+    }
     return .{ .values = result };
 }
 
 pub fn elementNeg(allocator: Allocator, a: Element) !Element {
     const result = try allocator.alloc(Rational, a.values.len);
-    for (result, 0..) |*value, i| value.* = try rationalNeg(allocator, a.values[i]);
+    var i: usize = 0;
+    while (i < result.len) : (i += 1) {
+        result[i] = try rationalNeg(allocator, a.values[i]);
+    }
     return .{ .values = result };
 }
 
@@ -261,7 +270,10 @@ pub fn elementSub(allocator: Allocator, modulus: []const Rational, a: Element, b
 
 pub fn elementScaleRational(allocator: Allocator, value: Element, factor: Rational) !Element {
     const result = try allocator.alloc(Rational, value.values.len);
-    for (result, 0..) |*component, i| component.* = try rationalMul(allocator, value.values[i], factor);
+    var i: usize = 0;
+    while (i < result.len) : (i += 1) {
+        result[i] = try rationalMul(allocator, value.values[i], factor);
+    }
     return .{ .values = result };
 }
 
@@ -271,8 +283,12 @@ pub fn elementMul(allocator: Allocator, modulus: []const Rational, a: Element, b
     const convolution_len = try std.math.sub(usize, try std.math.mul(usize, degree, 2), 1);
     const convolution = try allocator.alloc(Rational, convolution_len);
     for (convolution) |*value| value.* = try rationalZero(allocator);
-    for (a.values, 0..) |left, i| {
-        for (b.values, 0..) |right, j| {
+    var i: usize = 0;
+    while (i < a.values.len) : (i += 1) {
+        const left = a.values[i];
+        var j: usize = 0;
+        while (j < b.values.len) : (j += 1) {
+            const right = b.values[j];
             const product = try rationalMul(allocator, left, right);
             convolution[i + j] = try rationalAdd(allocator, convolution[i + j], product);
         }
@@ -282,20 +298,28 @@ pub fn elementMul(allocator: Allocator, modulus: []const Rational, a: Element, b
         power -= 1;
         const coefficient = convolution[power];
         if (rationalIsZero(coefficient)) continue;
-        for (modulus, 0..) |modulus_coefficient, j| {
+        var k: usize = 0;
+        while (k < modulus.len) : (k += 1) {
+            const modulus_coefficient = modulus[k];
             const product = try rationalMul(allocator, coefficient, modulus_coefficient);
-            convolution[power - degree + j] = try rationalSub(allocator, convolution[power - degree + j], product);
+            convolution[power - degree + k] = try rationalSub(allocator, convolution[power - degree + k], product);
         }
     }
     const values = try allocator.alloc(Rational, degree);
-    for (values, 0..) |*value, i| value.* = convolution[i];
+    var m: usize = 0;
+    while (m < values.len) : (m += 1) {
+        values[m] = convolution[m];
+    }
     return .{ .values = values };
 }
 
 pub fn elementScaleInteger(allocator: Allocator, value: Element, factor: usize) !Element {
     const scalar = try rationalFromInt(allocator, factor);
     const result = try allocator.alloc(Rational, value.values.len);
-    for (result, 0..) |*component, i| component.* = try rationalMul(allocator, value.values[i], scalar);
+    var i: usize = 0;
+    while (i < result.len) : (i += 1) {
+        result[i] = try rationalMul(allocator, value.values[i], scalar);
+    }
     return .{ .values = result };
 }
 
@@ -314,9 +338,10 @@ pub fn elementText(allocator: Allocator, value: Element) ![]u8 {
     var output = std.ArrayList(u8).init(allocator);
     errdefer output.deinit();
     try output.append('[');
-    for (value.values, 0..) |component, i| {
+    var i: usize = 0;
+    while (i < value.values.len) : (i += 1) {
         if (i > 0) try output.append(',');
-        const text = try rationalText(allocator, component);
+        const text = try rationalText(allocator, value.values[i]);
         defer allocator.free(text);
         try output.appendSlice(text);
     }
@@ -345,11 +370,11 @@ pub const Candidate = struct {
 
     pub fn build(allocator: Allocator, degree: usize, modulus_degree: usize, codes: []const BigInt) !Candidate {
         if (modulus_degree == 0) return error.InvalidCandidate;
-        var d = try BigInt.initSet(allocator, degree);
+        const d = try BigInt.initSet(allocator, degree);
         var d1 = try BigInt.init(allocator);
         var d2 = try BigInt.init(allocator);
         var monomial_product = try BigInt.init(allocator);
-        var two = try BigInt.initSet(allocator, 2);
+        const two = try BigInt.initSet(allocator, 2);
         var monomial_count = try BigInt.init(allocator);
         var remainder = try BigInt.init(allocator);
         var coefficient_factor = try BigInt.init(allocator);
@@ -454,16 +479,18 @@ pub const Candidate = struct {
             "{{\"stage\":\"{s}\",\"index\":\"{s}\",\"localIndex\":\"{s}\",\"degree\":{},\"modulusDegree\":{},\"codes\":[",
             .{ stage, global_index, local_index, degree, self.modulus.len },
         );
-        for (codes, 0..) |code, i| {
+        var i: usize = 0;
+        while (i < codes.len) : (i += 1) {
             if (i != 0) try output.append(',');
-            const text = try code.toString(allocator, 10, .lower);
+            const text = try codes[i].toString(allocator, 10, .lower);
             defer allocator.free(text);
             try appendJsonString(&output, text);
         }
         try output.appendSlice("],\"modulus\":[");
-        for (self.modulus, 0..) |coefficient, i| {
-            if (i != 0) try output.append(',');
-            const text = try rationalText(allocator, coefficient);
+        var k: usize = 0;
+        while (k < self.modulus.len) : (k += 1) {
+            if (k != 0) try output.append(',');
+            const text = try rationalText(allocator, self.modulus[k]);
             defer allocator.free(text);
             try appendJsonString(&output, text);
         }
@@ -584,9 +611,10 @@ fn appendJsonString(output: *std.ArrayList(u8), text: []const u8) !void {
 
 fn appendElementJson(output: *std.ArrayList(u8), value: Element) !void {
     try output.append('[');
-    for (value.values, 0..) |component, i| {
+    var i: usize = 0;
+    while (i < value.values.len) : (i += 1) {
         if (i != 0) try output.append(',');
-        const text = try rationalText(output.allocator, component);
+        const text = try rationalText(output.allocator, value.values[i]);
         defer output.allocator.free(text);
         try appendJsonString(output, text);
     }
@@ -595,7 +623,9 @@ fn appendElementJson(output: *std.ArrayList(u8), value: Element) !void {
 
 fn appendPolynomialJson(output: *std.ArrayList(u8), polynomial: Polynomial) !void {
     try output.append('[');
-    for (polynomial.terms.items, 0..) |term, i| {
+    var i: usize = 0;
+    while (i < polynomial.terms.items.len) : (i += 1) {
+        const term = polynomial.terms.items[i];
         if (i != 0) try output.append(',');
         try output.writer().print("{{\"x\":{},\"y\":{},\"coefficient\":", .{ term.index.x, term.index.y });
         try appendElementJson(output, term.value);
@@ -632,7 +662,7 @@ test "quotient-ring multiplication reduces every high-degree term" {
     const modulus = try allocator.alloc(Rational, 2);
     modulus[0] = try rationalOne(allocator);
     modulus[1] = try rationalZero(allocator);
-    var t_values = try allocator.alloc(Rational, 2);
+    const t_values = try allocator.alloc(Rational, 2);
     t_values[0] = try rationalZero(allocator);
     t_values[1] = try rationalOne(allocator);
     const t = Element{ .values = t_values };

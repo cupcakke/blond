@@ -1,0 +1,13 @@
+[ERROR LIST]
+- Line 72–87: `next` never installs error cleanup for `codes` or its initialized `BigInt` elements. Any subsequent failure leaks the allocated array and initialized elements when using an allocator requiring explicit deallocation.
+- Line 78–87: Successfully allocated index strings have no error cleanup. Failure while allocating a later string or advancing the iterator leaks all previously allocated strings.
+- Line 85–87: Iterator advancement is not transactional. For example, if both index increments succeed but the allocation at line 163 fails, `next` returns an error without returning the current work, leaving the indices incremented but the composition unchanged. Retrying associates that same composition with incorrect indices.
+- Line 121: `composition_count` is declared `var` but never mutated. Zig versions enforcing the “local variable is never mutated” diagnostic reject this declaration; it must be `const`.
+- Line 121–125: The newly created `composition_count` has no error cleanup before ownership transfers at line 127. If `self.coefficient_sum.copy` fails at line 125, that temporary `BigInt` leaks.
+- Line 122–128: `resetComposition` destroys the previous coefficients and installs their replacements before completing its remaining fallible operations. Failure at line 125 leaves the new coefficients installed without completing the corresponding sum, composition-count, and local-index updates. There is no rollback.
+- Line 170–177: `nextComposition` modifies the composition before completing fallible operations. If the allocation at line 175 fails, the selected coefficient has already been incremented, intermediate coefficients have been cleared, and the final coefficient has not been updated. The stored coefficients then sum to the previous sum plus one rather than preserving the required sum.
+- Line 188–198: `advanceShell` changes shell coordinates before successfully constructing the new shell’s coefficients. For example, if the allocation at line 101 fails during the subsequent reset, the iterator retains the previous shell’s coefficients under the new shell coordinates. Retrying `next` can return mismatched metadata and coefficient data.
+- Line 203–204: `clone` initializes an owning `BigInt` without installing `errdefer result.deinit()`. If `result.copy` fails, the initialized result’s storage is not released.
+- Line 209–210: `subtract` initializes an owning `BigInt` without installing `errdefer result.deinit()`. If `BigInt.sub` fails, the initialized result’s storage is not released.
+[END OF LIST]
+FILE CLOSED. IDENTIFIED ISSUES LISTED; EXHAUSTIVE VERIFICATION NOT ESTABLISHED.
