@@ -1,1 +1,2 @@
 - [Zig big-integer zero semantics](zig-big-integer-zero.md) — `Managed.order` can distinguish intermediate signed zeros that `eqlZero` treats as equal.
+- [Workflow process lifecycle](workflow-process-lifecycle.md) — a failed restart may coexist with a still-serving older Zig process that holds port 5000.
