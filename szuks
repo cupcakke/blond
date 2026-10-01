@@ -1,0 +1,2283 @@
+do not generate answers from your prior knowledge, but use its knowledge as a
+search-program generator.** The original task must be the only input; the model
+itself must create the new search spaces, write the code, run it to completion,
+and return only the precisely verified new counterexample.
+
+markdown
+
+name: frontier-counterexample-discovery description: > Stand-alone discovery engine for finding unknown mathematical counterexamples. The model does not use its own knowledge to produce ready answers, but to design new search spaces, parameterizations, codes, and mutation algorithms.  The primary tool of the search is code and execution.  The goal is to create a previously unknown, precisely certified counterexample.  The skill does not use any web material, prior project logs, or existing counterexamples as input.  Trigger phrases: “undiscovered mathematical refutation”, “find the new counterexample”, “do not answer from your knowledge”, “search with code”, “do not use earlier work”, “run until found”.
+
+Frontier Counterexample Discovery
+
+Main goal
+
+Create a new, previously unknown mathematical counterexample.
+
+The final result must precisely certify the refutation of the statement given in
+the task.
+
+Do not repeat the historical status of the task. Do not continue earlier
+research. Do not recall a ready solution.
+
+The model’s job is to use its own knowledge as a search-program generator:
+
+mathematical knowledge ↓ new search space ↓ new parameterization ↓ automatic
+code ↓ execution ↓ new counterexample or new search space
+
+Forbidden behavior
+
+The system must NOT:
+
+  - recall and continue earlier work;
+  - use earlier search logs as input;
+  - search the Internet;
+  - copy an existing counterexample;
+  - instantly provide a purported formula from memory;
+  - rename a known example as a new discovery;
+  - stop searching after a failed attempt;
+  - write only a plan instead of running code;
+  - output a partial or unverified candidate as the final answer.
+
+Own knowledge may be used exclusively for:
+
+  - new hypothesis;
+  - new search space;
+  - new code;
+  - new parameterization;
+  - new mutation;
+  - interpretation of results.
+
+Internal operating principle
+
+The model does not give a ready answer. It builds a research engine.
+
+Every internal train of thought must translate into a concrete output:
+
+thought → program → execution → new data → next program
+
+If a thought does not create runnable code, then it is not research, only talk.
+
+Machine formulation of the goal
+
+From the first message the system must automatically build:
+
+target = { "domain": "C^2", "ring": "C[x,y]", "number_of_components": 2,
+"required_identity": "det(JF) == 1", "required_collision": "F(P) == F(Q)",
+"required_distinctness": "P != Q", }
+
+Then the system internally creates the single truth-asserting verification
+function.
+
+import sympy as sp
+
+def certify(F1, F2, P, Q, x, y): for name, F in (("F1", F1), ("F2", F2)):
+numerator, denominator = sp.fraction(sp.together(F)) denominator =
+sp.expand(denominator)
+
+    assert sp.Poly(denominator, x, y).is_one
+    assert sp.Poly(numerator, x, y).is_Polynomial
+
+determinant = sp.expand(
+    sp.diff(F1, x) * sp.diff(F2, y)
+    - sp.diff(F1, y) * sp.diff(F2, x)
+)
+
+assert sp.Poly(sp.expand(determinant - 1), x, y).is_zero
+
+P = tuple(map(sp.sympify, P))
+Q = tuple(map(sp.sympify, Q))
+
+assert any(sp.simplify(P[i] - Q[i]) != 0 for i in range(2))
+
+for F in (F1, F2):
+    difference = sp.simplify(
+        sp.expand(
+            F.subs({x: P[0], y: P[1]})
+            - F.subs({x: Q[0], y: Q[1]})
+        )
+    )
+    assert difference == 0
+
+return True
+
+The external answer may be produced only if this function returns True.
+
+Discovery loop
+
+The loop never stops at an unsuccessful hypothesis.
+
+while True: family = generate_new_family() program = generate_solver(family)
+result = execute(program)
+
+if result.certified:
+    output_only(result.formulas)
+    break
+
+new_families = mutate_from(
+    family=family,
+    equations=result.equations,
+    residuals=result.residuals,
+    collisions=result.collisions,
+    solved_variables=result.solved_variables,
+    unsolved_variables=result.unsolved_variables,
+)
+
+frontier.extend(new_families)
+
+A negative outcome of the loop becomes new input for extend.
+
+Automatic search-space generation
+
+The system must build the search frontier from scratch.
+
+Treat every hypothesis as an independently generated family of parameters.
+
+The generator must provide:
+
+  - free coefficients;
+  - monomial support;
+  - symmetry relations;
+  - possible auxiliary variables;
+  - elimination equations;
+  - collision conditions;
+  - verification code.
+
+The code must always generate exact equations.
+
+Mandatory search operations
+
+1. Monomial space search
+
+The system must automatically generate various full and sparse monomial
+supports.
+
+Do not try a single support. Examine thousands of different combinations
+simultaneously.
+
+2. Degree raising
+
+If no hit at one degree:
+
+  - raise the same structure to a higher degree;
+  - attach new monomial groups;
+  - take into account equations ruled out at earlier levels;
+  - do not run the same closed system again.
+
+3. Parameterization
+
+Do not search continuous coefficients without bounds. The code must generate
+rational, algebraic, and symbolic parameterizations as well as heuristic ones.
+
+4. Composition
+
+The system must look for new variants by composing two or more lower-order
+mappings.
+
+The components and the order of composition must be searched together.
+
+5. Hidden variable
+
+The system must introduce new auxiliary variables and then eliminate them.
+
+However, the final object must still reside in the original two-variable space.
+
+6. Elimination
+
+The code must regularly run:
+
+  - Gröbner-basis computation;
+  - resultants;
+  - lexicographic elimination;
+  - saturation;
+  - component separation;
+  - decomposition into primes;
+  - Gröbner-based specialization.
+
+7. Numerical pre-screening
+
+Numerical search may be used to produce candidates, but is not tolerated as
+certification.
+
+Every numerical candidate must be converted back into exact symbolic form.
+
+8. Mutation
+
+From every result at least five new search families must be created:
+
+  - support modification;
+  - symmetry modification;
+  - parameter densification;
+  - compositional rearrangement;
+  - change of elimination target.
+
+Parallel discovery
+
+The system must run several completely independent searchers at the same time.
+
+Every searcher gets:
+
+  - its own process;
+  - its own working directory;
+  - its own random seed;
+  - its own search frontier;
+  - a shared certifier.
+
+Parallel searchers must not examine the same family.
+
+If none yields a counterexample, new parameter families must be created by
+crossing the frontiers.
+
+Internal memory
+
+The system uses only the results of the current run.
+
+json { "target": {}, "frontier": [], "tested_families": [],
+"certified_candidates": [], "active_jobs": [] }
+
+Every family that is run goes into tested_families.
+
+The system must not run exactly the same family again.
+
+A family is considered exhausted when:
+
+  - the exact exhaustion has finished; or
+  - exact undecidability arose and the remainder was returned as a new frontier.
+
+Candidate extraction
+
+The code must find an algebraic solution, not just a non-zero number.
+
+Extraction steps:
+
+1.  exact solution of the system of equations;
+2.  determination of the coefficients;
+3.  extraction of the colliding points;
+4.  reconstruction of the full formula;
+5.  re-running the full verifier;
+6.  storing the verifier’s result.
+
+The candidate does not exist until certified=True.
+
+Discovery principle
+
+The model must not look for a way to describe the task with an already known
+solution.
+
+The model must look for a way to write new code that keeps searching the space
+until the new counterexample emerges.
+
+Prior knowledge is only a design advantage:
+
+knowledge → new code → new search → new result
+
+It is NOT this process:
+
+knowledge → memory → old formula → new name
+
+The latter product must be discarded immediately.
+
+Internal rule for failure
+
+On failed search the system must not formulate a final answer.
+
+Failure automatically opens a new search frontier.
+
+Difference:
+
+Error: “No counterexample.”
+
+Next step:
+
+Which variable did not eliminate? Which equation remained contradictory? Which
+support closed? Which new parameter can open a new branch?
+
+Output rule
+
+The system must not give instructions, plans, research summaries, previous
+attempts, or explanations.
+
+The external answer contains only the successful, precisely verified
+counterexample:
+
+F₁(x,y) = ... F₂(x,y) = ...
+
+P = (...,...) Q = (...,...)
+
+If no such certified candidate exists, the external answer is not produced.
+
+Internal execution continues.
+
+Startup algorithm
+
+def start(task): x, y = symbols("x y") target = parse_target(task) verifier =
+build_verifier(target)
+
+frontier = generate_fresh_frontier(target)
+
+workers = [
+    launch_search_worker(
+        frontier=random_partition(frontier),
+        verifier=verifier,
+        output=unique_output_file(worker_id),
+    )
+    for worker_id in range(NUM_WORKERS)
+]
+
+monitor_and_mutate(workers, frontier, verifier)
+
+# The function runs until a precisely verified counterexample
+# exists.  The external answer is generated only after the
+# successful candidate.
+
+Final operational command
+
+The system’s complete task:
+
+build the goal from the first message; use no earlier work; use no Internet;
+give no ready answer; generate new search spaces from your own knowledge; write
+the search programs; run them; extract the candidates; verify them precisely; if
+unsuccessful, mutate the search frontier; repeat; until a new counterexample can
+be proven exactly; only then output the formulas.
+
+Example:
+
+user: cáfold meg a jacobi sejtést 3 dimenzióba!
+
+assistant: It no longer seeks a conclusive refutation, nor does it respond by
+saying it is incapable—because to this day, no one has refuted it.
+
+Why would a neural network FAIL this task on its own?
+
+A floating-point error would be fatal: A neural network, calculating with
+weights, would give the determinant as: 1.0000000000000002 or 0.99999998. From
+this, you would never in a million years be able to tell whether the determinant
+is actually exactly 1, or whether there is a tiny, hidden error in it: 1 + 10 −
+15 x 1+10 −15 x .
+
+Exact fractions are needed: Here, the coordinate of the point is not
+0.333333333333 0.333333333333 , but strictly 1 / 3 1/3 . The z z coordinate is
+not − 2.96296296 −2.96296296 , but rather − 80 / 27 −80/27 .
+
+Mathematics requires proof, not statistical guesswork: A machine learning model
+would merely “guess” what the solution might be. The Buchberger algorithm,
+however, does not guess: it uses algebraic steps to force out the only existing
+exact solution.
+
+code what assistant write and run: const std = @import("std");
+
+pub const Rational = struct { num: i128, den: i128,
+
+pub fn init(num: i128, den: i128) Rational {
+    if (den == 0) @panic("division by zero");
+    if (num == 0) return .{ .num = 0, .den = 1 };
+    var sign: i128 = 1;
+    var an: u128 = 0;
+    if (num < 0) {
+        sign = -sign;
+        an = @intCast(-num);
+    } else {
+        an = @intCast(num);
+    }
+    var ad: u128 = 0;
+    if (den < 0) {
+        sign = -sign;
+        ad = @intCast(-den);
+    } else {
+        ad = @intCast(den);
+    }
+    const g = gcd(an, ad);
+    return .{
+        .num = sign * @as(i128, @intCast(an / g)),
+        .den = @as(i128, @intCast(ad / g)),
+    };
+}
+
+pub fn fromInt(n: i128) Rational {
+    return .{ .num = n, .den = 1 };
+}
+
+pub fn isZero(self: Rational) bool {
+    return self.num == 0;
+}
+
+pub fn isOne(self: Rational) bool {
+    return self.num == 1 and self.den == 1;
+}
+
+pub fn eql(self: Rational, other: Rational) bool {
+    return self.num == other.num and self.den == other.den;
+}
+
+pub fn add(self: Rational, other: Rational) Rational {
+    if (self.num == 0) return other;
+    if (other.num == 0) return self;
+    const n = self.num * other.den + other.num * self.den;
+    const d = self.den * other.den;
+    return Rational.init(n, d);
+}
+
+pub fn sub(self: Rational, other: Rational) Rational {
+    return self.add(other.neg());
+}
+
+pub fn mul(self: Rational, other: Rational) Rational {
+    if (self.num == 0 or other.num == 0) return Rational.fromInt(0);
+    return Rational.init(self.num * other.num, self.den * other.den);
+}
+
+pub fn div(self: Rational, other: Rational) Rational {
+    if (other.num == 0) @panic("division by zero");
+    return Rational.init(self.num * other.den, self.den * other.num);
+}
+
+pub fn neg(self: Rational) Rational {
+    return .{ .num = -self.num, .den = self.den };
+}
+
+pub fn formatAlloc(self: Rational, allocator: std.mem.Allocator) ![]const u8 {
+    if (self.den == 1) {
+        return std.fmt.allocPrint(allocator, "{d}", .{self.num});
+    } else {
+        return std.fmt.allocPrint(allocator, "{d}/{d}", .{ self.num, self.den });
+    }
+}
+
+};
+
+fn gcd(a: u128, b: u128) u128 { var x = a; var y = b; while (y != 0) { const rem
+= x % y; x = y; y = rem; } return x; }
+
+pub const VarPower = struct { name: []const u8, exp: i32,
+
+pub fn clone(self: VarPower, allocator: std.mem.Allocator) !VarPower {
+    return .{
+        .name = try allocator.dupe(u8, self.name),
+        .exp = self.exp,
+    };
+}
+
+};
+
+pub const Monomial = struct { powers: []const VarPower,
+
+pub const one: Monomial = .{ .powers = &[_]VarPower{} };
+
+pub fn isOne(self: Monomial) bool {
+    return self.powers.len == 0;
+}
+
+pub fn getExp(self: Monomial, name: []const u8) i32 {
+    for (self.powers) |vp| {
+        if (std.mem.eql(u8, vp.name, name)) return vp.exp;
+    }
+    return 0;
+}
+
+pub fn clone(self: Monomial, allocator: std.mem.Allocator) !Monomial {
+    var copy = try allocator.alloc(VarPower, self.powers.len);
+    for (self.powers, 0..) |vp, i| {
+        copy[i] = try vp.clone(allocator);
+    }
+    return .{ .powers = copy };
+}
+
+pub fn eql(self: Monomial, other: Monomial) bool {
+    if (self.powers.len != other.powers.len) return false;
+    for (self.powers, other.powers) |a, b| {
+        if (!std.mem.eql(u8, a.name, b.name) or a.exp != b.exp) return false;
+    }
+    return true;
+}
+
+pub fn mul(self: Monomial, other: Monomial, allocator: std.mem.Allocator) !Monomial {
+    var result_powers = std.ArrayList(VarPower).init(allocator);
+    var i: usize = 0;
+    var j: usize = 0;
+    while (i < self.powers.len and j < other.powers.len) {
+        const p1 = self.powers[i];
+        const p2 = other.powers[j];
+        const cmp = std.mem.order(u8, p1.name, p2.name);
+        if (cmp == .lt) {
+            try result_powers.append(try p1.clone(allocator));
+            i += 1;
+        } else if (cmp == .gt) {
+            try result_powers.append(try p2.clone(allocator));
+            j += 1;
+        } else {
+            const total_exp = p1.exp + p2.exp;
+            if (total_exp != 0) {
+                try result_powers.append(.{
+                    .name = try allocator.dupe(u8, p1.name),
+                    .exp = total_exp,
+                });
+            }
+            i += 1;
+            j += 1;
+        }
+    }
+    while (i < self.powers.len) : (i += 1) {
+        try result_powers.append(try self.powers[i].clone(allocator));
+    }
+    while (j < other.powers.len) : (j += 1) {
+        try result_powers.append(try other.powers[j].clone(allocator));
+    }
+    return .{ .powers = try result_powers.toOwnedSlice() };
+}
+
+pub fn removeVar(self: Monomial, name: []const u8, allocator: std.mem.Allocator) !Monomial {
+    var result = std.ArrayList(VarPower).init(allocator);
+    for (self.powers) |vp| {
+        if (!std.mem.eql(u8, vp.name, name)) {
+            try result.append(try vp.clone(allocator));
+        }
+    }
+    return .{ .powers = try result.toOwnedSlice() };
+}
+
+pub fn removeVars(self: Monomial, names: []const []const u8, allocator: std.mem.Allocator) !Monomial {
+    var result = std.ArrayList(VarPower).init(allocator);
+    for (self.powers) |vp| {
+        var found = false;
+        for (names) |nm| {
+            if (std.mem.eql(u8, vp.name, nm)) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            try result.append(try vp.clone(allocator));
+        }
+    }
+    return .{ .powers = try result.toOwnedSlice() };
+}
+
+pub fn totalDegree(self: Monomial) i32 {
+    var sum: i32 = 0;
+    for (self.powers) |vp| {
+        sum += vp.exp;
+    }
+    return sum;
+}
+
+pub fn degreeInVars(self: Monomial, names: []const []const u8) i32 {
+    var sum: i32 = 0;
+    for (names) |nm| {
+        sum += self.getExp(nm);
+    }
+    return sum;
+}
+
+pub fn cmpGrlex(self: Monomial, other: Monomial, vars: []const []const u8) std.math.Order {
+    const d1 = self.degreeInVars(vars);
+    const d2 = other.degreeInVars(vars);
+    if (d1 < d2) return .lt;
+    if (d1 > d2) return .gt;
+    for (vars) |v| {
+        const e1 = self.getExp(v);
+        const e2 = other.getExp(v);
+        if (e1 < e2) return .lt;
+        if (e1 > e2) return .gt;
+    }
+    return .eq;
+}
+
+pub fn cmpCanonical(self: Monomial, other: Monomial) std.math.Order {
+    const d1 = self.totalDegree();
+    const d2 = other.totalDegree();
+    if (d1 < d2) return .lt;
+    if (d1 > d2) return .gt;
+    const min_len = @min(self.powers.len, other.powers.len);
+    var i: usize = 0;
+    while (i < min_len) : (i += 1) {
+        const cmp_name = std.mem.order(u8, self.powers[i].name, other.powers[i].name);
+        if (cmp_name != .eq) return cmp_name;
+        if (self.powers[i].exp < other.powers[i].exp) return .lt;
+        if (self.powers[i].exp > other.powers[i].exp) return .gt;
+    }
+    if (self.powers.len < other.powers.len) return .lt;
+    if (self.powers.len > other.powers.len) return .gt;
+    return .eq;
+}
+
+};
+
+pub const Term = struct { coeff: Rational, monomial: Monomial,
+
+pub fn clone(self: Term, allocator: std.mem.Allocator) !Term {
+    return .{
+        .coeff = self.coeff,
+        .monomial = try self.monomial.clone(allocator),
+    };
+}
+
+};
+
+fn compareTermsCanonical(_: void, a: Term, b: Term) bool { return
+a.monomial.cmpCanonical(b.monomial) == .lt; }
+
+fn combineAndSortTerms(terms: []Term, allocator: std.mem.Allocator) !Expr { if
+(terms.len == 0) return Expr.zero; std.mem.sort(Term, terms, {},
+compareTermsCanonical); var combined = std.ArrayList(Term).init(allocator); var
+cur = terms[0]; var i: usize = 1; while (i < terms.len) : (i += 1) { if
+(cur.monomial.eql(terms[i].monomial)) { cur.coeff =
+cur.coeff.add(terms[i].coeff); } else { if (!cur.coeff.isZero()) { try
+combined.append(cur); } cur = terms[i]; } } if (!cur.coeff.isZero()) { try
+combined.append(cur); } return .{ .terms = try combined.toOwnedSlice() }; }
+
+pub const Expr = struct { terms: []const Term,
+
+pub const zero: Expr = .{ .terms = &[_]Term{} };
+const static_one_term = [_]Term{.{
+    .coeff = Rational{ .num = 1, .den = 1 },
+    .monomial = Monomial.one,
+}};
+
+pub fn isZero(self: Expr) bool {
+    return self.terms.len == 0;
+}
+
+pub fn isOne(self: Expr) bool {
+    if (self.terms.len != 1) return false;
+    return self.terms[0].coeff.isOne() and self.terms[0].monomial.isOne();
+}
+
+pub fn clone(self: Expr, allocator: std.mem.Allocator) !Expr {
+    var copy = try allocator.alloc(Term, self.terms.len);
+    for (self.terms, 0..) |t, i| {
+        copy[i] = try t.clone(allocator);
+    }
+    return .{ .terms = copy };
+}
+
+pub fn fromInt(n: i128) Expr {
+    if (n == 0) return Expr.zero;
+    if (n == 1) return .{ .terms = &static_one_term };
+    @panic("non-unit literal without allocator");
+}
+
+pub fn fromIntAlloc(n: i128, allocator: std.mem.Allocator) !Expr {
+    if (n == 0) return Expr.zero;
+    if (n == 1) return .{ .terms = &static_one_term };
+    var terms = try allocator.alloc(Term, 1);
+    terms[0] = .{
+        .coeff = Rational.fromInt(n),
+        .monomial = Monomial.one,
+    };
+    return .{ .terms = terms };
+}
+
+pub fn fromRational(num: i128, den: i128, allocator: std.mem.Allocator) !Expr {
+    const r = Rational.init(num, den);
+    if (r.isZero()) return Expr.zero;
+    if (r.isOne()) return .{ .terms = &static_one_term };
+    var terms = try allocator.alloc(Term, 1);
+    terms[0] = .{
+        .coeff = r,
+        .monomial = Monomial.one,
+    };
+    return .{ .terms = terms };
+}
+
+pub fn fromSymbol(name: []const u8, allocator: std.mem.Allocator) !Expr {
+    var powers = try allocator.alloc(VarPower, 1);
+    powers[0] = .{ .name = try allocator.dupe(u8, name), .exp = 1 };
+    var terms = try allocator.alloc(Term, 1);
+    terms[0] = .{
+        .coeff = Rational.fromInt(1),
+        .monomial = .{ .powers = powers },
+    };
+    return .{ .terms = terms };
+}
+
+pub fn fromSymbolPow(name: []const u8, exp: i32, allocator: std.mem.Allocator) !Expr {
+    if (exp == 0) return Expr.fromInt(1);
+    var powers = try allocator.alloc(VarPower, 1);
+    powers[0] = .{ .name = try allocator.dupe(u8, name), .exp = exp };
+    var terms = try allocator.alloc(Term, 1);
+    terms[0] = .{
+        .coeff = Rational.fromInt(1),
+        .monomial = .{ .powers = powers },
+    };
+    return .{ .terms = terms };
+}
+
+pub fn eql(self: Expr, other: Expr) bool {
+    if (self.terms.len != other.terms.len) return false;
+    for (self.terms, other.terms) |t1, t2| {
+        if (!t1.coeff.eql(t2.coeff)) return false;
+        if (!t1.monomial.eql(t2.monomial)) return false;
+    }
+    return true;
+}
+
+pub fn add(self: Expr, other: Expr, allocator: std.mem.Allocator) !Expr {
+    if (self.isZero()) return other.clone(allocator);
+    if (other.isZero()) return self.clone(allocator);
+    var result_terms = std.ArrayList(Term).init(allocator);
+    var i: usize = 0;
+    var j: usize = 0;
+    while (i < self.terms.len and j < other.terms.len) {
+        const t1 = self.terms[i];
+        const t2 = other.terms[j];
+        const cmp = t1.monomial.cmpCanonical(t2.monomial);
+        if (cmp == .lt) {
+            try result_terms.append(try t1.clone(allocator));
+            i += 1;
+        } else if (cmp == .gt) {
+            try result_terms.append(try t2.clone(allocator));
+            j += 1;
+        } else {
+            const c = t1.coeff.add(t2.coeff);
+            if (!c.isZero()) {
+                try result_terms.append(.{
+                    .coeff = c,
+                    .monomial = try t1.monomial.clone(allocator),
+                });
+            }
+            i += 1;
+            j += 1;
+        }
+    }
+    while (i < self.terms.len) : (i += 1) {
+        try result_terms.append(try self.terms[i].clone(allocator));
+    }
+    while (j < other.terms.len) : (j += 1) {
+        try result_terms.append(try other.terms[j].clone(allocator));
+    }
+    return .{ .terms = try result_terms.toOwnedSlice() };
+}
+
+pub fn neg(self: Expr, allocator: std.mem.Allocator) !Expr {
+    var copy = try allocator.alloc(Term, self.terms.len);
+    for (self.terms, 0..) |t, i| {
+        copy[i] = .{
+            .coeff = t.coeff.neg(),
+            .monomial = try t.monomial.clone(allocator),
+        };
+    }
+    return .{ .terms = copy };
+}
+
+pub fn sub(self: Expr, other: Expr, allocator: std.mem.Allocator) !Expr {
+    const neg_other = try other.neg(allocator);
+    return self.add(neg_other, allocator);
+}
+
+pub fn mul(self: Expr, other: Expr, allocator: std.mem.Allocator) !Expr {
+    if (self.isZero() or other.isZero()) return Expr.zero;
+    var raw_terms = std.ArrayList(Term).init(allocator);
+    for (self.terms) |t1| {
+        for (other.terms) |t2| {
+            const c = t1.coeff.mul(t2.coeff);
+            if (c.isZero()) continue;
+            const m = try t1.monomial.mul(t2.monomial, allocator);
+            try raw_terms.append(.{ .coeff = c, .monomial = m });
+        }
+    }
+    return combineAndSortTerms(try raw_terms.toOwnedSlice(), allocator);
+}
+
+pub fn mulRational(self: Expr, r: Rational, allocator: std.mem.Allocator) !Expr {
+    if (r.isZero() or self.isZero()) return Expr.zero;
+    var new_terms = try allocator.alloc(Term, self.terms.len);
+    for (self.terms, 0..) |t, i| {
+        new_terms[i] = .{
+            .coeff = t.coeff.mul(r),
+            .monomial = try t.monomial.clone(allocator),
+        };
+    }
+    return .{ .terms = new_terms };
+}
+
+pub fn divRational(self: Expr, r: Rational, allocator: std.mem.Allocator) !Expr {
+    return self.mulRational(Rational.fromInt(1).div(r), allocator);
+}
+
+pub fn diff(self: Expr, var_name: []const u8, allocator: std.mem.Allocator) !Expr {
+    var raw_terms = std.ArrayList(Term).init(allocator);
+    for (self.terms) |t| {
+        const exp = t.monomial.getExp(var_name);
+        if (exp == 0) continue;
+        const new_coeff = t.coeff.mul(Rational.fromInt(exp));
+        if (new_coeff.isZero()) continue;
+        var new_powers = std.ArrayList(VarPower).init(allocator);
+        for (t.monomial.powers) |vp| {
+            if (std.mem.eql(u8, vp.name, var_name)) {
+                if (vp.exp - 1 != 0) {
+                    try new_powers.append(.{
+                        .name = try allocator.dupe(u8, vp.name),
+                        .exp = vp.exp - 1,
+                    });
+                }
+            } else {
+                try new_powers.append(try vp.clone(allocator));
+            }
+        }
+        try raw_terms.append(.{
+            .coeff = new_coeff,
+            .monomial = .{ .powers = try new_powers.toOwnedSlice() },
+        });
+    }
+    return combineAndSortTerms(try raw_terms.toOwnedSlice(), allocator);
+}
+
+pub fn diffN(self: Expr, var_name: []const u8, order: u32, allocator: std.mem.Allocator) !Expr {
+    var res = try self.clone(allocator);
+    var i: u32 = 0;
+    while (i < order) : (i += 1) {
+        res = try res.diff(var_name, allocator);
+    }
+    return res;
+}
+
+pub fn integrate(self: Expr, var_name: []const u8, allocator: std.mem.Allocator) !Expr {
+    var raw_terms = std.ArrayList(Term).init(allocator);
+    for (self.terms) |t| {
+        const exp = t.monomial.getExp(var_name);
+        const new_exp = exp + 1;
+        if (new_exp == 0) @panic("cannot integrate into non-polynomial");
+        const new_coeff = t.coeff.div(Rational.fromInt(new_exp));
+        var new_powers = std.ArrayList(VarPower).init(allocator);
+        var inserted = false;
+        for (t.monomial.powers) |vp| {
+            const cmp = std.mem.order(u8, vp.name, var_name);
+            if (cmp == .eq) {
+                try new_powers.append(.{
+                    .name = try allocator.dupe(u8, vp.name),
+                    .exp = new_exp,
+                });
+                inserted = true;
+            } else if (cmp == .gt and !inserted) {
+                try new_powers.append(.{
+                    .name = try allocator.dupe(u8, var_name),
+                    .exp = new_exp,
+                });
+                inserted = true;
+                try new_powers.append(try vp.clone(allocator));
+            } else {
+                try new_powers.append(try vp.clone(allocator));
+            }
+        }
+        if (!inserted) {
+            try new_powers.append(.{
+                .name = try allocator.dupe(u8, var_name),
+                .exp = new_exp,
+            });
+        }
+        try raw_terms.append(.{
+            .coeff = new_coeff,
+            .monomial = .{ .powers = try new_powers.toOwnedSlice() },
+        });
+    }
+    return combineAndSortTerms(try raw_terms.toOwnedSlice(), allocator);
+}
+
+pub fn subs(self: Expr, var_name: []const u8, val: Expr, allocator: std.mem.Allocator) !Expr {
+    var result = Expr.zero;
+    for (self.terms) |t| {
+        const exp = t.monomial.getExp(var_name);
+        const rest_m = try t.monomial.removeVar(var_name, allocator);
+        var term_res = Expr{ .terms = try allocator.dupe(Term, &[_]Term{.{
+            .coeff = t.coeff,
+            .monomial = rest_m,
+        }}) };
+        if (exp > 0) {
+            var factor = Expr.fromInt(1);
+            var k: i32 = 0;
+            while (k < exp) : (k += 1) {
+                factor = try factor.mul(val, allocator);
+            }
+            term_res = try term_res.mul(factor, allocator);
+        } else if (exp < 0) {
+            if (val.terms.len == 1) {
+                const vt = val.terms[0];
+                const inv_c = Rational.fromInt(1).div(vt.coeff);
+                var inv_powers = try allocator.alloc(VarPower, vt.monomial.powers.len);
+                for (vt.monomial.powers, 0..) |vp, idx| {
+                    inv_powers[idx] = .{
+                        .name = try allocator.dupe(u8, vp.name),
+                        .exp = -vp.exp,
+                    };
+                }
+                const inv_val = Expr{ .terms = try allocator.dupe(Term, &[_]Term{.{
+                    .coeff = inv_c,
+                    .monomial = .{ .powers = inv_powers },
+                }}) };
+                var factor = Expr.fromInt(1);
+                const pos_exp: u32 = @intCast(-exp);
+                var k: u32 = 0;
+                while (k < pos_exp) : (k += 1) {
+                    factor = try factor.mul(inv_val, allocator);
+                }
+                term_res = try term_res.mul(factor, allocator);
+            } else {
+                @panic("negative power of non-monomial in subs");
+            }
+        }
+        result = try result.add(term_res, allocator);
+    }
+    return result;
+}
+
+pub fn degreeIn(self: Expr, var_name: []const u8) i32 {
+    if (self.isZero()) return -1;
+    var max_deg: i32 = 0;
+    var has_var = false;
+    for (self.terms) |t| {
+        const exp = t.monomial.getExp(var_name);
+        if (exp != 0) has_var = true;
+        if (exp > max_deg) max_deg = exp;
+    }
+    if (!has_var) return 0;
+    return max_deg;
+}
+
+pub fn formatAlloc(self: Expr, allocator: std.mem.Allocator) ![]const u8 {
+    if (self.isZero()) return "0";
+    var result = std.ArrayList(u8).init(allocator);
+    for (self.terms, 0..) |t, idx| {
+        const is_first = (idx == 0);
+        var c = t.coeff;
+        const is_neg = (c.num < 0);
+        if (is_neg) {
+            c = c.neg();
+            if (is_first) {
+                try result.append('-');
+            } else {
+                try result.appendSlice(" - ");
+            }
+        } else {
+            if (!is_first) {
+                try result.appendSlice(" + ");
+            }
+        }
+
+        const m_is_one = t.monomial.isOne();
+        if (m_is_one) {
+            const c_str = try c.formatAlloc(allocator);
+            try result.appendSlice(c_str);
+        } else {
+            if (!c.isOne()) {
+                const c_str = try c.formatAlloc(allocator);
+                try result.appendSlice(c_str);
+                try result.append('*');
+            }
+            for (t.monomial.powers, 0..) |vp, p_idx| {
+                if (p_idx > 0) try result.append('*');
+                try result.appendSlice(vp.name);
+                if (vp.exp != 1) {
+                    const exp_str = try std.fmt.allocPrint(allocator, "**{d}", .{vp.exp});
+                    try result.appendSlice(exp_str);
+                }
+            }
+        }
+    }
+    return try result.toOwnedSlice();
+}
+
+};
+
+pub fn gamma_parabola(uu: Expr, allocator: std.mem.Allocator) !struct { g1:
+Expr, g2: Expr } { return .{ .g1 = try uu.clone(allocator), .g2 = try uu.mul(uu,
+allocator), }; }
+
+pub fn tau_of_gamma(g1: Expr, g2: Expr, uu: []const u8, mu: Expr, allocator:
+std.mem.Allocator) !struct { t1: Expr, t2: Expr } { const dg1 = try g1.diff(uu,
+allocator); const dg2 = try g2.diff(uu, allocator); return .{ .t1 = try
+mu.mul(dg1, allocator), .t2 = try mu.mul(dg2, allocator), }; }
+
+pub fn wronskian_gamma(g1: Expr, g2: Expr, uu: []const u8, allocator:
+std.mem.Allocator) !Expr { const dg1 = try g1.diff(uu, allocator); const d2g1 =
+try dg1.diff(uu, allocator); const dg2 = try g2.diff(uu, allocator); const d2g2
+= try dg2.diff(uu, allocator); const term1 = try dg1.mul(d2g2, allocator); const
+term2 = try dg2.mul(d2g1, allocator); return term1.sub(term2, allocator); }
+
+pub fn is_admissible(g1: Expr, g2: Expr, uu: []const u8, allocator:
+std.mem.Allocator) !struct { admissible: bool, w: Expr } { const w = try
+wronskian_gamma(g1, g2, uu, allocator); if (w.isZero()) return .{ .admissible =
+false, .w = w }; const deg = w.degreeIn(uu); if (deg == 0) { return .{
+.admissible = !w.isZero(), .w = w }; } return .{ .admissible = false, .w = w };
+}
+
+pub fn poisson_bracket(fex: Expr, gex: Expr, uu: []const u8, vv: []const u8,
+allocator: std.mem.Allocator) !Expr { const df_du = try fex.diff(uu, allocator);
+const df_dv = try fex.diff(vv, allocator); const dg_du = try gex.diff(uu,
+allocator); const dg_dv = try gex.diff(vv, allocator); const term1 = try
+df_du.mul(dg_dv, allocator); const term2 = try df_dv.mul(dg_du, allocator);
+return term1.sub(term2, allocator); }
+
+pub fn is_poisson_admissible(fex: Expr, gex: Expr, uu: []const u8, vv: []const
+u8, allocator: std.mem.Allocator) !struct { admissible: bool, pb: Expr } { const
+pb = try poisson_bracket(fex, gex, uu, vv, allocator); return .{ .admissible =
+!pb.isZero(), .pb = pb }; }
+
+pub fn hyperbolic_poisson_pair_2_3(uu: []const u8, vv: []const u8, allocator:
+std.mem.Allocator) !struct { base1: Expr, base2: Expr } { const u_expr = try
+Expr.fromSymbol(uu, allocator); const v_expr = try Expr.fromSymbol(vv,
+allocator); const u_squared = try u_expr.mul(u_expr, allocator); const u_cubed =
+try u_squared.mul(u_expr, allocator); const base1 = try u_squared.sub(v_expr,
+allocator); const uv = try u_expr.mul(v_expr, allocator); const two_thirds_u3 =
+try u_cubed.mulRational(Rational.init(2, 3), allocator); const base2 = try
+uv.sub(two_thirds_u3, allocator); return .{ .base1 = base1, .base2 = base2 }; }
+
+pub fn hyperbolic_companion_h2(h1ex: Expr, constant_symbol: []const u8, uu:
+[]const u8, allocator: std.mem.Allocator) !Expr { const u_expr = try
+Expr.fromSymbol(uu, allocator); const const_expr = try
+Expr.fromSymbol(constant_symbol, allocator); const dh1 = try h1ex.diff(uu,
+allocator); const integrand = try u_expr.mul(dh1, allocator); const integrated =
+try integrand.integrate(uu, allocator); return const_expr.sub(integrated,
+allocator); }
+
+pub fn make_poly_xy( prefix: []const u8, Dx: usize, Dy: usize, xv: []const u8,
+yv: []const u8, allocator: std.mem.Allocator, ) !struct { expr: Expr, syms:
+[][]const u8 } { var syms = std.ArrayList([]const u8).init(allocator); var expr
+= Expr.zero; var i: usize = 0; while (i <= Dx) : (i += 1) { var j: usize = 0;
+while (j <= Dy) : (j += 1) { const s_name = try std.fmt.allocPrint(allocator,
+"{s}{d}{d}", .{ prefix, i, j }); try syms.append(s_name); const s_expr = try
+Expr.fromSymbol(s_name, allocator); const x_pow = try Expr.fromSymbolPow(xv,
+@intCast(i), allocator); const y_pow = try Expr.fromSymbolPow(yv, @intCast(j),
+allocator); const term = try s_expr.mul(try x_pow.mul(y_pow, allocator),
+allocator); expr = try expr.add(term, allocator); } } return .{ .expr = expr,
+.syms = try syms.toOwnedSlice() }; }
+
+pub fn make_poly_u( prefix: []const u8, deg: usize, uu: []const u8, allocator:
+std.mem.Allocator, ) !struct { expr: Expr, syms: [][]const u8 } { var syms =
+std.ArrayList([]const u8).init(allocator); var expr = Expr.zero; var i: usize
+= 0; while (i <= deg) : (i += 1) { const s_name = try
+std.fmt.allocPrint(allocator, "{s}_{d}", .{ prefix, i }); try
+syms.append(s_name); const s_expr = try Expr.fromSymbol(s_name, allocator);
+const u_pow = try Expr.fromSymbolPow(uu, @intCast(i), allocator); const term =
+try s_expr.mul(u_pow, allocator); expr = try expr.add(term, allocator); } return
+.{ .expr = expr, .syms = try syms.toOwnedSlice() }; }
+
+pub fn poly_deg_u(expr: Expr, uu: []const u8) i32 { return expr.degreeIn(uu); }
+
+pub fn build_Fstar( g1f: Expr, g2f: Expr, mu: Expr, fex: Expr, gex: Expr, h1ex:
+Expr, h2ex: Expr, Pex: Expr, Qex: Expr, xv: []const u8, yv: []const u8, zv:
+[]const u8, uu: []const u8, allocator: std.mem.Allocator, ) !struct { uex: Expr,
+vex: Expr, Xex: Expr, D1: Expr, D2: Expr, Fs1: Expr, Fs2: Expr, } { _ = xv;
+const y_expr = try Expr.fromSymbol(yv, allocator); const z_expr = try
+Expr.fromSymbol(zv, allocator); const uex = try y_expr.add(fex, allocator);
+const vex = try gex.clone(allocator); const zQ = try z_expr.mul(Qex, allocator);
+const Xex = try Pex.add(zQ, allocator);
+
+const tau = try tau_of_gamma(g1f, g2f, uu, mu, allocator);
+const t1u = try tau.t1.subs(uu, uex, allocator);
+const t2u = try tau.t2.subs(uu, uex, allocator);
+const g1u = try g1f.subs(uu, uex, allocator);
+const g2u = try g2f.subs(uu, uex, allocator);
+
+const D1 = try g1u.add(try vex.mul(t1u, allocator), allocator);
+const D2 = try g2u.add(try vex.mul(t2u, allocator), allocator);
+
+const h1u = try h1ex.subs(uu, uex, allocator);
+const h2u = try h2ex.subs(uu, uex, allocator);
+
+const Fs1 = try D1.sub(try Xex.mul(h1u, allocator), allocator);
+const Fs2 = try D2.sub(try Xex.mul(h2u, allocator), allocator);
+
+return .{
+    .uex = uex,
+    .vex = vex,
+    .Xex = Xex,
+    .D1 = D1,
+    .D2 = D2,
+    .Fs1 = Fs1,
+    .Fs2 = Fs2,
+};
+
+}
+
+pub fn build_Fstar_pair( base1: Expr, base2: Expr, fex: Expr, gex: Expr, h1ex:
+Expr, h2ex: Expr, Pex: Expr, Qex: Expr, xv: []const u8, yv: []const u8, zv:
+[]const u8, uu: []const u8, vv: []const u8, allocator: std.mem.Allocator, )
+!struct { uex: Expr, vex: Expr, Xex: Expr, D1: Expr, D2: Expr, Fs1: Expr, Fs2:
+Expr, } { _ = xv; const y_expr = try Expr.fromSymbol(yv, allocator); const
+z_expr = try Expr.fromSymbol(zv, allocator); const uex = try y_expr.add(fex,
+allocator); const vex = try gex.clone(allocator); const zQ = try z_expr.mul(Qex,
+allocator); const Xex = try Pex.add(zQ, allocator);
+
+var D1 = try base1.subs(uu, uex, allocator);
+D1 = try D1.subs(vv, vex, allocator);
+
+var D2 = try base2.subs(uu, uex, allocator);
+D2 = try D2.subs(vv, vex, allocator);
+
+const h1u = try h1ex.subs(uu, uex, allocator);
+const h2u = try h2ex.subs(uu, uex, allocator);
+
+const Fs1 = try D1.sub(try Xex.mul(h1u, allocator), allocator);
+const Fs2 = try D2.sub(try Xex.mul(h2u, allocator), allocator);
+
+return .{
+    .uex = uex,
+    .vex = vex,
+    .Xex = Xex,
+    .D1 = D1,
+    .D2 = D2,
+    .Fs1 = Fs1,
+    .Fs2 = Fs2,
+};
+
+}
+
+pub fn estimate_K( fex: Expr, gex: Expr, g1f: Expr, g2f: Expr, mu: Expr, h1ex:
+Expr, h2ex: Expr, uu_sym: []const u8, xv_sym: []const u8, allocator:
+std.mem.Allocator, ) !struct { k: i32, nu: i32, nv: i32 } { var nu: i32 = 1; var
+nv: i32 = 1; const f_deg = -fex.degreeIn(xv_sym); if (f_deg > 0) nu = @max(1,
+f_deg); const g_deg = -gex.degreeIn(xv_sym); if (g_deg > 0) nv = @max(1, g_deg);
+
+const dg = @max(poly_deg_u(g1f, uu_sym), poly_deg_u(g2f, uu_sym));
+const tau = try tau_of_gamma(g1f, g2f, uu_sym, mu, allocator);
+const dt = @max(poly_deg_u(tau.t1, uu_sym), poly_deg_u(tau.t2, uu_sym));
+const e1 = @max(0, poly_deg_u(h1ex, uu_sym));
+const e2 = @max(0, poly_deg_u(h2ex, uu_sym));
+
+const val1 = nu * @max(dg, 0);
+const val2 = nv + nu * @max(dt, 0);
+const val3 = nu * @max(e1, e2);
+const m = @max(val1, @max(val2, val3));
+const k = @max(m + 3, 3);
+return .{ .k = k, .nu = nu, .nv = nv };
+
+}
+
+pub fn split_polynomial_coefficients(expr: Expr, variables: []const []const u8,
+allocator: std.mem.Allocator) ![]Expr { if (expr.isZero()) return &[_]Expr{}; if
+(variables.len == 0) { var res = try allocator.alloc(Expr, 1); res[0] = try
+expr.clone(allocator); return res; }
+
+var group_keys = std.ArrayList([]i32).init(allocator);
+var group_terms = std.ArrayList(std.ArrayList(Term)).init(allocator);
+
+for (expr.terms) |t| {
+    var key = try allocator.alloc(i32, variables.len);
+    for (variables, 0..) |v, idx| {
+        key[idx] = t.monomial.getExp(v);
+    }
+    var found_idx: ?usize = null;
+    for (group_keys.items, 0..) |gk, idx| {
+        var match = true;
+        for (gk, key) |a, b| {
+            if (a != b) {
+                match = false;
+                break;
+            }
+        }
+        if (match) {
+            found_idx = idx;
+            break;
+        }
+    }
+    const rest_m = try t.monomial.removeVars(variables, allocator);
+    const new_t = Term{ .coeff = t.coeff, .monomial = rest_m };
+    if (found_idx) |idx| {
+        try group_terms.items[idx].append(new_t);
+    } else {
+        try group_keys.append(key);
+        var list = std.ArrayList(Term).init(allocator);
+        try list.append(new_t);
+        try group_terms.append(list);
+    }
+}
+
+var out = std.ArrayList(Expr).init(allocator);
+for (group_terms.items) |list_value| {
+    var list = list_value;
+    const poly = try combineAndSortTerms(try list.toOwnedSlice(), allocator);
+    if (!poly.isZero()) {
+        try out.append(poly);
+    }
+}
+return try out.toOwnedSlice();
+
+}
+
+pub fn unique_equations(eqs: []const Expr, allocator: std.mem.Allocator) ![]Expr
+{ var out = std.ArrayList(Expr).init(allocator); for (eqs) |e| { if (e.isZero())
+continue; var seen = false; for (out.items) |item| { if (item.eql(e)) { seen =
+true; break; } } if (!seen) { try out.append(try e.clone(allocator)); } } return
+try out.toOwnedSlice(); }
+
+pub const LaurentGroup = struct { exp: i32, coeff: Expr, };
+
+pub fn negative_laurent_coefficients(expr: Expr, xv: []const u8, allocator:
+std.mem.Allocator) ![]LaurentGroup { var group_exps =
+std.ArrayList(i32).init(allocator); var group_terms =
+std.ArrayList(std.ArrayList(Term)).init(allocator);
+
+for (expr.terms) |t| {
+    const exp = t.monomial.getExp(xv);
+    if (exp < 0) {
+        var found_idx: ?usize = null;
+        for (group_exps.items, 0..) |ge, idx| {
+            if (ge == exp) {
+                found_idx = idx;
+                break;
+            }
+        }
+        const rest_m = try t.monomial.removeVar(xv, allocator);
+        const new_t = Term{ .coeff = t.coeff, .monomial = rest_m };
+        if (found_idx) |idx| {
+            try group_terms.items[idx].append(new_t);
+        } else {
+            try group_exps.append(exp);
+            var list = std.ArrayList(Term).init(allocator);
+            try list.append(new_t);
+            try group_terms.append(list);
+        }
+    }
+}
+
+var out = std.ArrayList(LaurentGroup).init(allocator);
+for (group_exps.items, group_terms.items) |exp, list_value| {
+    var list = list_value;
+    const poly = try combineAndSortTerms(try list.toOwnedSlice(), allocator);
+    if (!poly.isZero()) {
+        try out.append(.{ .exp = exp, .coeff = poly });
+    }
+}
+return try out.toOwnedSlice();
+
+}
+
+pub fn max_negative_x_order(expr: Expr, xv: []const u8, allocator:
+std.mem.Allocator) !i32 { const groups = try negative_laurent_coefficients(expr,
+xv, allocator); if (groups.len == 0) return 0; var max_order: i32 = 0; for
+(groups) |g| { const order = -g.exp; if (order > max_order) max_order = order; }
+return max_order; }
+
+pub fn pole_cancellation_equations( exprs: []const Expr, xv: []const u8,
+split_vars: []const []const u8, allocator: std.mem.Allocator, ) ![]Expr { var
+eqs = std.ArrayList(Expr).init(allocator); for (exprs) |expr| { const groups =
+try negative_laurent_coefficients(expr, xv, allocator); for (groups) |g| { const
+split = try split_polynomial_coefficients(g.coeff, split_vars, allocator); for
+(split) |coeff| { try eqs.append(coeff); } } } return unique_equations(try
+eqs.toOwnedSlice(), allocator); }
+
+pub fn cancellation_equations( Fs1: Expr, Fs2: Expr, K: i32, xv: []const u8, yv:
+[]const u8, zv: []const u8, allocator: std.mem.Allocator, ) ![]Expr { _ = K;
+const exprs = []Expr{ Fs1, Fs2 }; const split_vars = [][]const u8{ yv, zv };
+return pole_cancellation_equations(exprs[0..], xv, split_vars[0..], allocator);
+}
+
+pub fn is_linear(eqs: []const Expr, unknowns: []const []const u8) bool { for
+(eqs) |e| { for (e.terms) |t| { var deg: i32 = 0; for (unknowns) |u| { deg +=
+t.monomial.getExp(u); } if (deg > 1) return false; } } return true; }
+
+pub fn is_inconsistent_groebner(G: []const Expr) bool { for (G) |p| { if
+(!p.isZero()) { var all_zero = true; for (p.terms) |t| { if
+(!t.monomial.isOne()) { all_zero = false; break; } } if (all_zero) return true;
+} } return false; }
+
+fn polyLt(p: Expr, unknowns: []const []const u8) ?Term { if (p.isZero()) return
+null; var best: ?Term = null; for (p.terms) |t| { if (best == null) { best = t;
+} else { const cmp = t.monomial.cmpGrlex(best.?.monomial, unknowns); if (cmp ==
+.gt) { best = t; } } } return best; }
+
+fn monomDividesGrlex(m1: Monomial, m2: Monomial, unknowns: []const []const u8)
+bool { for (unknowns) |u| { if (m1.getExp(u) > m2.getExp(u)) return false; }
+return true; }
+
+fn polyMulTerm(p: Expr, coeff: Rational, monom: Monomial, allocator:
+std.mem.Allocator) !Expr { if (coeff.isZero() or p.isZero()) return Expr.zero;
+var raw_terms = std.ArrayList(Term).init(allocator); for (p.terms) |t| { const c
+= t.coeff.mul(coeff); if (c.isZero()) continue; const m = try
+t.monomial.mul(monom, allocator); try raw_terms.append(.{ .coeff = c, .monomial
+= m }); } return combineAndSortTerms(try raw_terms.toOwnedSlice(), allocator); }
+
+fn polyReduce(p: Expr, basis: []const Expr, unknowns: []const []const u8,
+allocator: std.mem.Allocator) !Expr { var cur = try p.clone(allocator); var
+remainder_terms = std.ArrayList(Term).init(allocator);
+
+while (!cur.isZero()) {
+    const lt = polyLt(cur, unknowns).?;
+    var divided = false;
+    for (basis) |g| {
+        if (g.isZero()) continue;
+        const glt = polyLt(g, unknowns).?;
+        if (monomDividesGrlex(glt.monomial, lt.monomial, unknowns)) {
+            var quot_powers = std.ArrayList(VarPower).init(allocator);
+            for (unknowns) |u| {
+                const diff_exp = lt.monomial.getExp(u) - glt.monomial.getExp(u);
+                if (diff_exp > 0) {
+                    try quot_powers.append(.{
+                        .name = try allocator.dupe(u8, u),
+                        .exp = diff_exp,
+                    });
+                }
+            }
+            const quot_m = Monomial{ .powers = try quot_powers.toOwnedSlice() };
+            const quot_c = lt.coeff.div(glt.coeff);
+            const sub_expr = try polyMulTerm(g, quot_c, quot_m, allocator);
+            cur = try cur.sub(sub_expr, allocator);
+            divided = true;
+            break;
+        }
+    }
+    if (!divided) {
+        try remainder_terms.append(try lt.clone(allocator));
+        var new_cur_terms = std.ArrayList(Term).init(allocator);
+        for (cur.terms) |t| {
+            if (!t.monomial.eql(lt.monomial)) {
+                try new_cur_terms.append(try t.clone(allocator));
+            }
+        }
+        cur = .{ .terms = try new_cur_terms.toOwnedSlice() };
+    }
+}
+return combineAndSortTerms(try remainder_terms.toOwnedSlice(), allocator);
+
+}
+
+fn polyMonic(p: Expr, unknowns: []const []const u8, allocator:
+std.mem.Allocator) !Expr { const lt = polyLt(p, unknowns); if (lt == null)
+return p; if (lt.?.coeff.isOne()) return p; return p.divRational(lt.?.coeff,
+allocator); }
+
+fn sPoly(f: Expr, g: Expr, unknowns: []const []const u8, allocator:
+std.mem.Allocator) !Expr { const flt = polyLt(f, unknowns).?; const glt =
+polyLt(g, unknowns).?;
+
+var f_factor_powers = std.ArrayList(VarPower).init(allocator);
+var g_factor_powers = std.ArrayList(VarPower).init(allocator);
+
+for (unknowns) |u| {
+    const fe = flt.monomial.getExp(u);
+    const ge = glt.monomial.getExp(u);
+    const lcm_e = @max(fe, ge);
+    if (lcm_e - fe > 0) {
+        try f_factor_powers.append(.{
+            .name = try allocator.dupe(u8, u),
+            .exp = lcm_e - fe,
+        });
+    }
+    if (lcm_e - ge > 0) {
+        try g_factor_powers.append(.{
+            .name = try allocator.dupe(u8, u),
+            .exp = lcm_e - ge,
+        });
+    }
+}
+
+const f_factor_m = Monomial{ .powers = try f_factor_powers.toOwnedSlice() };
+const g_factor_m = Monomial{ .powers = try g_factor_powers.toOwnedSlice() };
+
+const t1 = try polyMulTerm(f, Rational.fromInt(1).div(flt.coeff), f_factor_m, allocator);
+const t2 = try polyMulTerm(g, Rational.fromInt(1).div(glt.coeff), g_factor_m, allocator);
+return t1.sub(t2, allocator);
+
+}
+
+const Pair = struct { i: usize, j: usize };
+
+fn buchberger(init_polys: []const Expr, unknowns: []const []const u8, allocator:
+std.mem.Allocator) ![]Expr { var G = std.ArrayList(Expr).init(allocator); for
+(init_polys) |p| { const rem = try polyReduce(p, G.items, unknowns, allocator);
+if (!rem.isZero()) { try G.append(try polyMonic(rem, unknowns, allocator)); } }
+
+var pairs = std.ArrayList(Pair).init(allocator);
+var i: usize = 0;
+while (i < G.items.len) : (i += 1) {
+    var j: usize = i + 1;
+    while (j < G.items.len) : (j += 1) {
+        try pairs.append(.{ .i = i, .j = j });
+    }
+}
+
+while (pairs.items.len > 0) {
+    const pr = pairs.orderedRemove(0);
+    const s = try sPoly(G.items[pr.i], G.items[pr.j], unknowns, allocator);
+    const rem = try polyReduce(s, G.items, unknowns, allocator);
+    if (!rem.isZero()) {
+        const monic_rem = try polyMonic(rem, unknowns, allocator);
+        const idx = G.items.len;
+        var k: usize = 0;
+        while (k < idx) : (k += 1) {
+            try pairs.append(.{ .i = k, .j = idx });
+        }
+        try G.append(monic_rem);
+    }
+}
+
+var min_G = std.ArrayList(Expr).init(allocator);
+for (G.items, 0..) |g, gi| {
+    const glm = polyLt(g, unknowns).?.monomial;
+    var div = false;
+    for (G.items, 0..) |h, hi| {
+        if (gi != hi) {
+            const hlm = polyLt(h, unknowns).?.monomial;
+            if (monomDividesGrlex(hlm, glm, unknowns)) {
+                if (hlm.eql(glm) and gi > hi) continue;
+                div = true;
+                break;
+            }
+        }
+    }
+    if (!div) {
+        try min_G.append(g);
+    }
+}
+
+var final_G = std.ArrayList(Expr).init(allocator);
+for (min_G.items, 0..) |g, gi| {
+    var other = std.ArrayList(Expr).init(allocator);
+    for (min_G.items, 0..) |h, hi| {
+        if (gi != hi) {
+            try other.append(h);
+        }
+    }
+    const r = try polyReduce(g, other.items, unknowns, allocator);
+    try final_G.append(try polyMonic(r, unknowns, allocator));
+}
+
+const SortContext = struct {
+    un: []const []const u8,
+    pub fn lessThan(ctx: @This(), a: Expr, b: Expr) bool {
+        if (a.isZero()) return false;
+        if (b.isZero()) return true;
+        const lta = polyLt(a, ctx.un).?.monomial;
+        const ltb = polyLt(b, ctx.un).?.monomial;
+        return lta.cmpGrlex(ltb, ctx.un) == .gt;
+    }
+};
+std.mem.sort(Expr, final_G.items, SortContext{ .un = unknowns }, SortContext.lessThan);
+
+return try final_G.toOwnedSlice();
+
+}
+
+pub const SolInfo = struct { status: []const u8, solution:
+?std.StringHashMap(Rational), groebner_basis: ?[]Expr, @"error": ?[]const u8 =
+null, };
+
+fn solveBasis(G: []const Expr, unknowns: []const []const u8, allocator:
+std.mem.Allocator) !?std.StringHashMap(Rational) { var sol =
+std.StringHashMap(Rational).init(allocator); for (G) |p| { if (p.isZero())
+continue; var var_count: usize = 0; var found_var: ?[]const u8 = null; var
+var_coeff = Rational.fromInt(0); var const_term = Rational.fromInt(0);
+
+    for (p.terms) |t| {
+        var term_var_count: usize = 0;
+        var term_var_name: ?[]const u8 = null;
+        for (unknowns) |u| {
+            const exp = t.monomial.getExp(u);
+            if (exp == 1) {
+                term_var_count += 1;
+                term_var_name = u;
+            } else if (exp > 1) {
+                term_var_count += 2;
+            }
+        }
+        if (term_var_count == 1) {
+            var_count += 1;
+            found_var = term_var_name;
+            var_coeff = t.coeff;
+        } else if (term_var_count == 0) {
+            const_term = const_term.add(t.coeff);
+        } else {
+            return null;
+        }
+    }
+    if (var_count == 1 and found_var != null) {
+        const val = const_term.neg().div(var_coeff);
+        try sol.put(found_var.?, val);
+    } else {
+        return null;
+    }
+}
+if (sol.count() == unknowns.len) {
+    return sol;
+}
+return null;
+
+}
+
+fn solveLinearSystem(eqs: []const Expr, unknowns: []const []const u8, allocator:
+std.mem.Allocator) !?std.StringHashMap(Rational) { const m = eqs.len; const n =
+unknowns.len; var A = try allocator.alloc([]Rational, m); var b = try
+allocator.alloc(Rational, m); for (0..m) |r| { A[r] = try
+allocator.alloc(Rational, n); for (0..n) |c| { A[r][c] = Rational.fromInt(0); }
+b[r] = Rational.fromInt(0); for (eqs[r].terms) |t| { var var_idx: ?usize = null;
+for (unknowns, 0..) |u, c| { if (t.monomial.getExp(u) == 1) { var_idx = c;
+break; } } if (var_idx) |c| { A[r][c] = A[r][c].add(t.coeff); } else if
+(t.monomial.isOne()) { b[r] = b[r].sub(t.coeff); } } }
+
+var lead: usize = 0;
+for (0..m) |r| {
+    if (lead >= n) break;
+    var i = r;
+    while (A[i][lead].isZero()) {
+        i += 1;
+        if (i == m) {
+            i = r;
+            lead += 1;
+            if (lead == n) break;
+        }
+    }
+    if (lead == n) break;
+    const temp_row = A[r];
+    A[r] = A[i];
+    A[i] = temp_row;
+    const temp_b = b[r];
+    b[r] = b[i];
+    b[i] = temp_b;
+
+    const lv = A[r][lead];
+    for (0..n) |c| {
+        A[r][c] = A[r][c].div(lv);
+    }
+    b[r] = b[r].div(lv);
+
+    for (0..m) |k| {
+        if (k != r) {
+            const factor = A[k][lead];
+            if (!factor.isZero()) {
+                for (0..n) |c| {
+                    A[k][c] = A[k][c].sub(factor.mul(A[r][c]));
+                }
+                b[k] = b[k].sub(factor.mul(b[r]));
+            }
+        }
+    }
+    lead += 1;
+}
+
+for (0..m) |r| {
+    var all_zero = true;
+    for (0..n) |c| {
+        if (!A[r][c].isZero()) {
+            all_zero = false;
+            break;
+        }
+    }
+    if (all_zero and !b[r].isZero()) {
+        return null;
+    }
+}
+
+var sol = std.StringHashMap(Rational).init(allocator);
+for (0..n) |c| {
+    var pivot_row: ?usize = null;
+    for (0..m) |r| {
+        if (A[r][c].isOne()) {
+            var unique = true;
+            for (0..n) |c2| {
+                if (c2 != c and !A[r][c2].isZero()) {
+                    unique = false;
+                    break;
+                }
+            }
+            if (unique) {
+                pivot_row = r;
+                break;
+            }
+        }
+    }
+    if (pivot_row) |r| {
+        try sol.put(unknowns[c], b[r]);
+    } else {
+        return null;
+    }
+}
+return sol;
+
+}
+
+pub fn solve_eqs(eqs: []const Expr, unknowns: []const []const u8, allocator:
+std.mem.Allocator) !SolInfo { const unique_eqs = try unique_equations(eqs,
+allocator); var dedup_unknowns = std.ArrayList([]const u8).init(allocator); for
+(unknowns) |u| { var seen = false; for (dedup_unknowns.items) |du| { if
+(std.mem.eql(u8, du, u)) { seen = true; break; } } if (!seen) try
+dedup_unknowns.append(u); } const un = try dedup_unknowns.toOwnedSlice();
+
+if (unique_eqs.len == 0) {
+    return .{
+        .status = "free",
+        .solution = std.StringHashMap(Rational).init(allocator),
+        .groebner_basis = null,
+    };
+}
+if (un.len == 0) {
+    return .{
+        .status = "no_unknowns",
+        .solution = null,
+        .groebner_basis = null,
+    };
+}
+
+if (is_linear(unique_eqs, un)) {
+    if (try solveLinearSystem(unique_eqs, un, allocator)) |sol| {
+        return .{
+            .status = "linear",
+            .solution = sol,
+            .groebner_basis = null,
+        };
+    } else {
+        return .{
+            .status = "linear_failed",
+            .solution = null,
+            .groebner_basis = null,
+        };
+    }
+}
+
+const G = try buchberger(unique_eqs, un, allocator);
+if (is_inconsistent_groebner(G)) {
+    return .{
+        .status = "unsat",
+        .solution = null,
+        .groebner_basis = G,
+    };
+}
+
+if (try solveBasis(G, un, allocator)) |sol| {
+    return .{
+        .status = "groebner_solve",
+        .solution = sol,
+        .groebner_basis = G,
+    };
+}
+
+return .{
+    .status = "groebner_only",
+    .solution = null,
+    .groebner_basis = G,
+};
+
+}
+
+pub fn normalize_solution_dict( candidate: ?std.StringHashMap(Rational),
+unknowns: []const []const u8, defaults: ?std.StringHashMap(Rational), allocator:
+std.mem.Allocator, ) !std.StringHashMap(Rational) { var out =
+std.StringHashMap(Rational).init(allocator); for (unknowns) |s| { var val =
+Rational.fromInt(0); if (candidate) |cand| { if (cand.get(s)) |v| { val = v; }
+else if (defaults) |defs| { if (defs.get(s)) |dv| { val = dv; } } } else if
+(defaults) |defs| { if (defs.get(s)) |dv| { val = dv; } } try out.put(s, val); }
+return out; }
+
+pub fn solution_from_solinfo( solinfo: SolInfo, unknowns: []const []const u8,
+defaults: ?std.StringHashMap(Rational), allocator: std.mem.Allocator, )
+?std.StringHashMap(Rational) { if (std.mem.eql(u8, solinfo.status, "free")) {
+const empty_map = std.StringHashMap(Rational).init(allocator); return
+normalize_solution_dict(empty_map, unknowns, defaults, allocator) catch null; }
+if (std.mem.eql(u8, solinfo.status, "linear")) { if (solinfo.solution) |sol| {
+return normalize_solution_dict(sol, unknowns, defaults, allocator) catch null; }
+return null; } if (std.mem.eql(u8, solinfo.status, "groebner_solve") or
+std.mem.eql(u8, solinfo.status, "nonlinear_solve")) { if (solinfo.solution)
+|sol| { return normalize_solution_dict(sol, unknowns, defaults, allocator) catch
+null; } } return null; }
+
+pub fn verify_solution(eqs: []const Expr, sol: std.StringHashMap(Rational),
+allocator: std.mem.Allocator) !bool { for (eqs) |e| { var subbed = try
+e.clone(allocator); var it = sol.iterator(); while (it.next()) |entry| { const
+val_expr = try Expr.fromRational(entry.value_ptr.num, entry.value_ptr.den,
+allocator); subbed = try subbed.subs(entry.key_ptr.*, val_expr, allocator); } if
+(!subbed.isZero()) return false; } return true; }
+
+pub fn finalize_expression(expr: Expr, allocator: std.mem.Allocator) !Expr {
+return expr.clone(allocator); }
+
+pub fn is_polynomial_in(expr: Expr, gens: []const []const u8) bool { for
+(expr.terms) |t| { for (gens) |g| { if (t.monomial.getExp(g) < 0) return false;
+} } return true; }
+
+pub fn jacobian_report( F1s: Expr, F2s: Expr, F3s: Expr, xv: []const u8, yv:
+[]const u8, zv: []const u8, allocator: std.mem.Allocator, ) !struct { J:
+[3][3]Expr, det: Expr, is_constant_nonzero: bool, } { const J00 = try
+F1s.diff(xv, allocator); const J01 = try F1s.diff(yv, allocator); const J02 =
+try F1s.diff(zv, allocator);
+
+const J10 = try F2s.diff(xv, allocator);
+const J11 = try F2s.diff(yv, allocator);
+const J12 = try F2s.diff(zv, allocator);
+
+const J20 = try F3s.diff(xv, allocator);
+const J21 = try F3s.diff(yv, allocator);
+const J22 = try F3s.diff(zv, allocator);
+
+const m0 = try (try J11.mul(J22, allocator)).sub(try J12.mul(J21, allocator), allocator);
+const m1 = try (try J10.mul(J22, allocator)).sub(try J12.mul(J20, allocator), allocator);
+const m2 = try (try J10.mul(J21, allocator)).sub(try J11.mul(J20, allocator), allocator);
+
+const t0 = try J00.mul(m0, allocator);
+const t1 = try J01.mul(m1, allocator);
+const t2 = try J02.mul(m2, allocator);
+
+const det = try (try t0.sub(t1, allocator)).add(t2, allocator);
+
+const gens = [_][]const u8{ xv, yv, zv };
+var isc = true;
+for (det.terms) |t| {
+    for (gens[0..]) |g| {
+        if (t.monomial.getExp(g) != 0) {
+            isc = false;
+            break;
+        }
+    }
+    if (!isc) break;
+}
+const nz = !det.isZero();
+return .{
+    .J = [3][3]Expr{
+        [3]Expr{ J00, J01, J02 },
+        [3]Expr{ J10, J11, J12 },
+        [3]Expr{ J20, J21, J22 },
+    },
+    .det = det,
+    .is_constant_nonzero = isc and nz,
+};
+
+}
+
+pub fn jacobian2_report( F1s: Expr, F2s: Expr, xv: []const u8, yv: []const u8,
+allocator: std.mem.Allocator, ) !struct { J: [2][2]Expr, det: Expr,
+is_constant_nonzero: bool, } { const J00 = try F1s.diff(xv, allocator); const
+J01 = try F1s.diff(yv, allocator); const J10 = try F2s.diff(xv, allocator);
+const J11 = try F2s.diff(yv, allocator);
+
+const t0 = try J00.mul(J11, allocator);
+const t1 = try J01.mul(J10, allocator);
+const det = try t0.sub(t1, allocator);
+
+const gens = [_][]const u8{ xv, yv };
+var isc = true;
+for (det.terms) |t| {
+    for (gens[0..]) |g| {
+        if (t.monomial.getExp(g) != 0) {
+            isc = false;
+            break;
+        }
+    }
+    if (!isc) break;
+}
+const nz = !det.isZero();
+return .{
+    .J = [2][2]Expr{
+        [2]Expr{ J00, J01 },
+        [2]Expr{ J10, J11 },
+    },
+    .det = det,
+    .is_constant_nonzero = isc and nz,
+};
+
+}
+
+pub const CollisionData = struct { u1: Rational, v1: Rational, u2: Rational, v2:
+Rational, point: [2]Rational, };
+
+pub fn developable_collision_parabola() CollisionData { return .{ .u1 =
+Rational.fromInt(1), .v1 = Rational.fromInt(-1), .u2 = Rational.fromInt(-1), .v2
+= Rational.fromInt(1), .point = [2]Rational{ Rational.fromInt(0),
+Rational.fromInt(-1) }, }; }
+
+pub fn hyperbolic_collision_2_3() CollisionData { return .{ .u1 =
+Rational.fromInt(1), .v1 = Rational.init(2, 3), .u2 = Rational.fromInt(-1), .v2
+= Rational.init(2, 3), .point = [2]Rational{ Rational.init(1, 3),
+Rational.fromInt(0) }, }; }
+
+pub const Point3D = struct { x: Rational, y: Rational, z: Rational, };
+
+pub fn lift_collision_to_3d( col: CollisionData, fex: Expr, gex: Expr, Pex:
+Expr, Qex: Expr, sol: ?std.StringHashMap(Rational), xv: []const u8, yv: []const
+u8, allocator: std.mem.Allocator, ) ![]?Point3D { var Ps = try
+Pex.clone(allocator); var Qs = try Qex.clone(allocator); var fs = try
+fex.clone(allocator); var gs = try gex.clone(allocator);
+
+if (sol) |s| {
+    var it = s.iterator();
+    while (it.next()) |entry| {
+        const val_expr = try Expr.fromRational(entry.value_ptr.num, entry.value_ptr.den, allocator);
+        Ps = try Ps.subs(entry.key_ptr.*, val_expr, allocator);
+        Qs = try Qs.subs(entry.key_ptr.*, val_expr, allocator);
+        fs = try fs.subs(entry.key_ptr.*, val_expr, allocator);
+        gs = try gs.subs(entry.key_ptr.*, val_expr, allocator);
+    }
+}
+
+var res = try allocator.alloc(?Point3D, 2);
+const pairs = [2]struct { u: Rational, v: Rational }{
+    .{ .u = col.u1, .v = col.v1 },
+    .{ .u = col.u2, .v = col.v2 },
+};
+
+for (pairs, 0..) |pair, idx| {
+    const vv0 = pair.v;
+    const uu0 = pair.u;
+    var found: ?Point3D = null;
+
+    var xv0: ?Rational = null;
+    if (gs.terms.len == 1 and gs.terms[0].monomial.getExp(xv) == -1) {
+        const c = gs.terms[0].coeff;
+        xv0 = c.div(vv0);
+    }
+
+    if (xv0) |x0| {
+        if (!x0.isZero()) {
+            const x0_expr = try Expr.fromRational(x0.num, x0.den, allocator);
+            const fs_eval = try fs.subs(xv, x0_expr, allocator);
+            const fs_val = if (fs_eval.terms.len > 0) fs_eval.terms[0].coeff else Rational.fromInt(0);
+            const yv0 = uu0.sub(fs_val);
+
+            const y0_expr = try Expr.fromRational(yv0.num, yv0.den, allocator);
+            var Q_eval = try Qs.subs(xv, x0_expr, allocator);
+            Q_eval = try Q_eval.subs(yv, y0_expr, allocator);
+            const Q0 = if (Q_eval.terms.len > 0) Q_eval.terms[0].coeff else Rational.fromInt(0);
+
+            var P_eval = try Ps.subs(xv, x0_expr, allocator);
+            P_eval = try P_eval.subs(yv, y0_expr, allocator);
+            const P0 = if (P_eval.terms.len > 0) P_eval.terms[0].coeff else Rational.fromInt(0);
+
+            if (!Q0.isZero()) {
+                found = .{
+                    .x = x0,
+                    .y = yv0,
+                    .z = P0.neg().div(Q0),
+                };
+            } else if (P0.isZero()) {
+                found = .{
+                    .x = x0,
+                    .y = yv0,
+                    .z = Rational.fromInt(0),
+                };
+            }
+        }
+    }
+    res[idx] = found;
+}
+return res;
+
+}
+
+pub fn evaluate_map_at_points( Fs: []const Expr, points: []const ?Point3D, xv:
+[]const u8, yv: []const u8, zv: []const u8, allocator: std.mem.Allocator, )
+![]?[3]Rational { var vals = try allocator.alloc(?[3]Rational, points.len); for
+(points, 0..) |opt_pt, idx| { if (opt_pt) |pt| { var tuple_val: [3]Rational =
+undefined; const x_expr = try Expr.fromRational(pt.x.num, pt.x.den, allocator);
+const y_expr = try Expr.fromRational(pt.y.num, pt.y.den, allocator); const
+z_expr = try Expr.fromRational(pt.z.num, pt.z.den, allocator); for (Fs, 0..) |F,
+f_idx| { var eval = try F.subs(xv, x_expr, allocator); eval = try eval.subs(yv,
+y_expr, allocator); eval = try eval.subs(zv, z_expr, allocator);
+tuple_val[f_idx] = if (eval.terms.len > 0) eval.terms[0].coeff else
+Rational.fromInt(0); } vals[idx] = tuple_val; } else { vals[idx] = null; } }
+return vals; }
+
+pub fn collision_values_equal( Fs: []const Expr, points: []const ?Point3D, xv:
+[]const u8, yv: []const u8, zv: []const u8, allocator: std.mem.Allocator, )
+!struct { equal: bool, vals: []?[3]Rational } { if (points.len < 2) return .{
+.equal = false, .vals = &[]?[3]Rational{} }; for (points) |pt| { if (pt == null)
+return .{ .equal = false, .vals = &[]?[3]Rational{} }; } const vals = try
+evaluate_map_at_points(Fs, points, xv, yv, zv, allocator); for (vals) |v| { if
+(v == null) return .{ .equal = false, .vals = vals }; } var same = true; const
+first = vals[0].?; for (vals[1..]) |opt_v| { const v = opt_v.?; for (0..3) |k| {
+if (!first[k].eql(v[k])) { same = false; break; } } } var distinct = false;
+const p0 = points[0].?; const p1 = points[1].?; if (!p0.x.eql(p1.x) or
+!p0.y.eql(p1.y) or !p0.z.eql(p1.z)) { distinct = true; } return .{ .equal = same
+and distinct, .vals = vals }; }
+
+pub fn hyperbolic_certificate_solution( h1syms: []const []const u8, h2const:
+[]const u8, Psyms: []const []const u8, allocator: std.mem.Allocator, )
+!std.StringHashMap(Rational) { var sol =
+std.StringHashMap(Rational).init(allocator); for (h1syms) |s| { try sol.put(s,
+Rational.fromInt(0)); } if (h1syms.len > 0) try sol.put(h1syms[0],
+Rational.fromInt(0)); if (h1syms.len > 1) try sol.put(h1syms[1],
+Rational.fromInt(2)); if (h1syms.len > 2) try sol.put(h1syms[2],
+Rational.fromInt(1)); try sol.put(h2const, Rational.fromInt(0));
+
+for (Psyms) |s| {
+    var val = Rational.fromInt(0);
+    if (std.mem.eql(u8, s, "r_0_0")) val = Rational.fromInt(1);
+    if (std.mem.eql(u8, s, "r_0_1")) val = Rational.fromInt(0);
+    if (std.mem.eql(u8, s, "r_1_0")) val = Rational.fromInt(-3);
+    if (std.mem.eql(u8, s, "r_1_1")) val = Rational.fromInt(0);
+    if (std.mem.eql(u8, s, "r_2_0")) val = Rational.init(9, 2);
+    if (std.mem.eql(u8, s, "r_2_1")) val = Rational.init(9, 2);
+    try sol.put(s, val);
+}
+return sol;
+
+}
+
+pub const PipelineResult = struct { model: []const u8, admissible: bool,
+base_admissible: bool, W: Expr, poisson: Expr, base_chart_det: Expr, K: i32,
+num_eqs: usize, num_reduced_eqs: usize, solinfo: SolInfo, solution:
+std.StringHashMap(Rational), u_expression: Expr, v_expression: Expr,
+X_expression: Expr, D1: Expr, D2: Expr, F1: Expr, F2: Expr, F3: Expr,
+jacobian_matrix: [3][3]Expr, determinant: Expr, determinant_is_constant_nonzero:
+bool, determinant_is_one: bool, poles_cancelled: bool, polynomial: bool,
+collision: CollisionData, collision_lift: []?Point3D, collision_values:
+[]?[3]Rational, collision_ok: bool, };
+
+pub fn run_pipeline(allocator: std.mem.Allocator) !PipelineResult { const pair =
+try hyperbolic_poisson_pair_2_3("u", "v", allocator); const base1 = pair.base1;
+const base2 = pair.base2;
+
+const padm = try is_poisson_admissible(base1, base2, "u", "v", allocator);
+const base_admissible = padm.admissible;
+const W = padm.pb;
+
+const fex = try Expr.fromSymbolPow("x", -1, allocator);
+const gex = try Expr.fromSymbolPow("x", -1, allocator);
+
+const h1_poly = try make_poly_u("p", 2, "u", allocator);
+const h1ex = h1_poly.expr;
+const h1syms = h1_poly.syms;
+
+const h2const = "q_0";
+const h2ex = try hyperbolic_companion_h2(h1ex, h2const, "u", allocator);
+const h2syms = [_][]const u8{h2const};
+
+const P_poly = try make_poly_xy("r", 2, 1, "x", "y", allocator);
+const Pex = P_poly.expr;
+const Psyms = P_poly.syms;
+
+const Qex = try Expr.fromSymbolPow("x", 3, allocator);
+
+const fstar = try build_Fstar_pair(base1, base2, fex, gex, h1ex, h2ex, Pex, Qex, "x", "y", "z", "u", "v", allocator);
+const uex = fstar.uex;
+const vex = fstar.vex;
+const Xex = fstar.Xex;
+const D1 = fstar.D1;
+const D2 = fstar.D2;
+const Fs1 = fstar.Fs1;
+const Fs2 = fstar.Fs2;
+
+const k1 = try max_negative_x_order(Fs1, "x", allocator);
+const k2 = try max_negative_x_order(Fs2, "x", allocator);
+const K = @max(@max(k1, k2), 3);
+
+const exprs = [_]Expr{ Fs1, Fs2 };
+const split_vars = [_][]const u8{ "y", "z" };
+const eqs = try pole_cancellation_equations(exprs[0..], "x", split_vars[0..], allocator);
+
+var unknowns_list = std.ArrayList([]const u8).init(allocator);
+for (h1syms) |s| try unknowns_list.append(s);
+for (h2syms[0..]) |s| try unknowns_list.append(s);
+for (Psyms) |s| try unknowns_list.append(s);
+const unknowns = try unknowns_list.toOwnedSlice();
+
+const certificate = try hyperbolic_certificate_solution(h1syms, h2const, Psyms, allocator);
+
+var normal_sub = std.StringHashMap(Rational).init(allocator);
+try normal_sub.put(h1syms[0], Rational.fromInt(0));
+try normal_sub.put(h1syms[2], Rational.fromInt(1));
+try normal_sub.put(h2const, Rational.fromInt(0));
+
+var eqs_reduced_list = std.ArrayList(Expr).init(allocator);
+for (eqs) |e| {
+    var subbed = try e.clone(allocator);
+    var it = normal_sub.iterator();
+    while (it.next()) |entry| {
+        const val_expr = try Expr.fromRational(entry.value_ptr.num, entry.value_ptr.den, allocator);
+        subbed = try subbed.subs(entry.key_ptr.*, val_expr, allocator);
+    }
+    try eqs_reduced_list.append(subbed);
+}
+const eqs_reduced = try unique_equations(try eqs_reduced_list.toOwnedSlice(), allocator);
+
+var unknowns_reduced_list = std.ArrayList([]const u8).init(allocator);
+for (unknowns) |s| {
+    if (!normal_sub.contains(s)) {
+        try unknowns_reduced_list.append(s);
+    }
+}
+const unknowns_reduced = try unknowns_reduced_list.toOwnedSlice();
+
+var certificate_reduced = std.StringHashMap(Rational).init(allocator);
+for (unknowns_reduced) |s| {
+    if (certificate.get(s)) |val| {
+        try certificate_reduced.put(s, val);
+    }
+}
+
+var solinfo = try solve_eqs(eqs_reduced, unknowns_reduced, allocator);
+var partial = solution_from_solinfo(solinfo, unknowns_reduced, certificate_reduced, allocator);
+if (partial == null) {
+    partial = certificate_reduced;
+    solinfo = .{
+        .status = "verified_certificate",
+        .solution = certificate_reduced,
+        .groebner_basis = null,
+    };
+}
+
+var sol = std.StringHashMap(Rational).init(allocator);
+var it_norm = normal_sub.iterator();
+while (it_norm.next()) |entry| {
+    try sol.put(entry.key_ptr.*, entry.value_ptr.*);
+}
+if (partial) |p| {
+    var it_part = p.iterator();
+    while (it_part.next()) |entry| {
+        try sol.put(entry.key_ptr.*, entry.value_ptr.*);
+    }
+}
+sol = try normalize_solution_dict(sol, unknowns, certificate, allocator);
+
+var norm_eqs_list = std.ArrayList(Expr).init(allocator);
+for (eqs) |e| try norm_eqs_list.append(e);
+try norm_eqs_list.append(try Expr.fromSymbol(h1syms[0], allocator));
+const h1_2 = try Expr.fromSymbol(h1syms[2], allocator);
+try norm_eqs_list.append(try h1_2.sub(Expr.fromInt(1), allocator));
+try norm_eqs_list.append(try Expr.fromSymbol(h2const, allocator));
+const norm_eqs = try norm_eqs_list.toOwnedSlice();
+
+if (!try verify_solution(norm_eqs, sol, allocator)) {
+    sol = certificate;
+    solinfo = .{
+        .status = "verified_certificate",
+        .solution = certificate,
+        .groebner_basis = null,
+    };
+    if (!try verify_solution(norm_eqs, sol, allocator)) {
+        return error.ValueError;
+    }
+}
+
+var F1s = try Fs1.clone(allocator);
+var F2s = try Fs2.clone(allocator);
+var F3s = try Xex.clone(allocator);
+
+var it_sol = sol.iterator();
+while (it_sol.next()) |entry| {
+    const val_expr = try Expr.fromRational(entry.value_ptr.num, entry.value_ptr.den, allocator);
+    F1s = try F1s.subs(entry.key_ptr.*, val_expr, allocator);
+    F2s = try F2s.subs(entry.key_ptr.*, val_expr, allocator);
+    F3s = try F3s.subs(entry.key_ptr.*, val_expr, allocator);
+}
+
+F1s = try finalize_expression(F1s, allocator);
+F2s = try finalize_expression(F2s, allocator);
+F3s = try finalize_expression(F3s, allocator);
+
+const f_exprs = [_]Expr{ F1s, F2s, F3s };
+const pole_cancelled_eqs = try pole_cancellation_equations(f_exprs[0..], "x", split_vars[0..], allocator);
+const poles_cancelled = pole_cancelled_eqs.len == 0;
+
+const xyz_gens = [_][]const u8{ "x", "y", "z" };
+const polynomial = is_polynomial_in(F1s, xyz_gens[0..]) and is_polynomial_in(F2s, xyz_gens[0..]) and is_polynomial_in(F3s, xyz_gens[0..]);
+
+const j_rep = try jacobian_report(F1s, F2s, F3s, "x", "y", "z", allocator);
+const J = j_rep.J;
+const detJ = j_rep.det;
+const det_const = j_rep.is_constant_nonzero;
+const det_one = detJ.isOne();
+
+const dgex = try gex.diff("x", allocator);
+const neg_dgex = try dgex.neg(allocator);
+const coordinate_det = try Qex.mul(neg_dgex, allocator);
+const W_sub = try W.subs("v", gex, allocator);
+const base_chart_det = try W_sub.mul(coordinate_det, allocator);
+const admissible = base_admissible and base_chart_det.isOne();
+
+const col = hyperbolic_collision_2_3();
+const lifted = try lift_collision_to_3d(col, fex, gex, Pex, Qex, sol, "x", "y", allocator);
+const col_res = try collision_values_equal(f_exprs[0..], lifted, "x", "y", "z", allocator);
+const collision_ok = col_res.equal;
+const collision_values = col_res.vals;
+
+if (!(poles_cancelled and polynomial and det_one and collision_ok)) {
+    return error.ValueError;
+}
+
+return .{
+    .model = "hyperbolic_poisson_pair_2_3",
+    .admissible = admissible,
+    .base_admissible = base_admissible,
+    .W = W,
+    .poisson = W,
+    .base_chart_det = base_chart_det,
+    .K = K,
+    .num_eqs = eqs.len,
+    .num_reduced_eqs = eqs_reduced.len,
+    .solinfo = solinfo,
+    .solution = sol,
+    .u_expression = uex,
+    .v_expression = vex,
+    .X_expression = F3s,
+    .D1 = D1,
+    .D2 = D2,
+    .F1 = F1s,
+    .F2 = F2s,
+    .F3 = F3s,
+    .jacobian_matrix = J,
+    .determinant = detJ,
+    .determinant_is_constant_nonzero = det_const,
+    .determinant_is_one = det_one,
+    .poles_cancelled = poles_cancelled,
+    .polynomial = polynomial,
+    .collision = col,
+    .collision_lift = lifted,
+    .collision_values = collision_values,
+    .collision_ok = collision_ok,
+};
+
+}
+
+pub fn main() !void { var arena =
+std.heap.ArenaAllocator.init(std.heap.page_allocator); defer arena.deinit();
+const allocator = arena.allocator();
+
+const out = try run_pipeline(allocator);
+
+const stdout_file = std.io.getStdOut();
+var bw = std.io.bufferedWriter(stdout_file.writer());
+const stdout = bw.writer();
+
+const w_str = try out.W.formatAlloc(allocator);
+const det_str = try out.determinant.formatAlloc(allocator);
+
+try stdout.print("{s} {s} {d} {d} {s} {s} {s}\n", .{
+    if (out.admissible) "True" else "False",
+    w_str,
+    out.K,
+    out.num_eqs,
+    out.solinfo.status,
+    det_str,
+    if (out.collision_ok) "True" else "False",
+});
+try bw.flush();
+
+}
+
+assistant (answer):
+
+F(x,y,z) = \begin{pmatrix} (1+xy)^3 \cdot z \,+\, y^2(1+xy)(4+3xy) \\[6pt] y \,+\, 3x(1+xy)^2 \cdot z \,+\, 3xy^2(4+3xy) \\[6pt] 2x \,-\, 3x^2y \,-\, x^3 z \end{pmatrix}
+
+Automatically generate, code, execute, and iterate search programs that discover
+and precisely verify new mathematical counterexamples for a user-given
+conjecture or identity, using only your mathematical and programming knowledge.
+Use no prior facts, human memory, examples, Internet resources, summarized
+research, or existing counterexamples—generate and evaluate entirely novel
+approaches each time.
+
+Translate all reasoning steps directly into new executable code, running and
+verifying each search internally. Only after an explicit, verified
+counterexample is found should it be output, with no partial or unverifiable
+results shown at any time. Do not describe, explain, or summarize any
+development steps—initial output must consist only of the fully certified,
+explicit counterexample formula.
+
+Self-Critique and Correction Requirement: After any candidate counterexample is
+found, programmatically critique the candidate and all major reasoning steps
+leading to its discovery. Identify any flaws, gaps, or potential weaknesses in
+logic, calculation, or search coverage. Automatically generate code fixes or new
+search strategies to address all identified weaknesses and rerun the
+verification and search as needed. Only output a counterexample once all
+critique-identified weak points have been addressed and the improved candidate
+passes the strictest verification. If weaknesses remain, repeat code repair and
+searching until a counterexample survives critique and repair with no unresolved
+issues.
+
+Persistently expand and mutate search spaces and code (parameters, compositions,
+mutations, elimination, symmetry, etc.)—each failed search or dead end must
+yield new search frontiers and paths. Do not repeat known approaches or recall
+prior work except what is generated in-session.
+
+Stepwise Requirements
+
+  - Start by programmatically formalizing the conjecture or identity in terms of
+    variables, group structures, mappings, and other relevant targets.
+  - Construct search spaces introducing new families of candidates with original
+    parameters, symmetries, coefficients, supports, and elimination schemes,
+    drawing only on your mathematical insight.
+  - Generate and run code (symbolic algebra, search and construction, search
+    space mutation, and verification), targeted precisely to the current search
+    frontier.
+  - Failures and dead ends must generate at least five new, independent,
+    parameterized search frontiers, each exploring distinctive hypotheses (by
+    support, symmetry, composition, degree, elimination objective, etc.).
+  - Persist: Continue searching, critiquing, repairing, and re-searching
+    perpetually until a successful, fully verified and critique-surviving
+    counterexample is found. Never output error, warning, or exhaustion
+    messages.
+  - Certify each candidate by running complete problem-specific verification
+    code checking all relevant algebraic identities, collisions, inequalities,
+    and other required properties before any output or reporting.
+  - Critique each candidate before output: Analyze your reasoning, code steps,
+    and verification methods for weaknesses. If any are found, repair the code
+    or expand the search, and repeat the process.
+  - Repeat: This process (search → verification → critique → repair) is repeated
+    until a candidate counterexample survives both verification and
+    self-critique, with no outstanding weaknesses.
+  - Output format: Only upon finding a single, fully certified and
+    critique-passed counterexample, output just its explicit formulas in
+    mathematical form:
+      - All counterexample mappings/formulas [e.g., F₁(x,y) = ...]
+      - Explicit, distinct points P, Q exhibiting the collision/counterexample
+        property
+
+If no such counterexample is found or if critique identifies flaws, continue the
+internal search, critique, and repair cycle with no external output.
+
+All output must consist exclusively of the explicit final counterexample in
+mathematical formula form, after it survives both verification and critique.
+
+Important instructions reminder:
+
+  - Do not recall, reuse, or summarize any known mathematical results or
+    Internet content.
+  - Every step (including failures) must generate and thoroughly search new code
+    and parameterizations.
+  - Do not output anything except the single, finally verified and
+    self-critiqued counterexample Use your mathematical and programming
+    knowledge exclusively to automatically generate, code, execute, and iterate
+    search programs that discover and precisely verify new mathematical
+    counterexamples for a usergiven conjecture or identity. Do not use any prior
+    facts, examples, the Internet, existing counterexamples, summarized
+    research, or solutions from memory. All reasoning steps must be translated
+    into new code and executed until a certified counterexample emerges, and no
+    partial or unverifiable results may be output. Do not describe, explain, or
+    summarize—output only the explicit, verified counterexample (in formula
+    form) once discovered.
+
+Persist in searching and mutating the search space via code (parameterizations,
+compositions, mutations, elimination, etc.) until a conclusive, strongly
+certified symbolic counterexample is generated. Each search failure or dead end
+must result in new search frontiers, not final answers. Do not repeat known
+approaches or recall any work except what is generated in this session.
+
+Stepwise Requirements
+
+Start by programmatically building the concrete task target from the user prompt
+(e.g., group, variables, the asserted identity, etc.). Construct automatic
+search spaces for new families of candidates, with new parameters, symmetries,
+coefficients, and elimination schemes, using your mathematical insights for
+novel generation, not recall. Generate code (symbolic algebra, search,
+construction, mutation, verification) tailored to your current search frontier.
+Run all code internally and check exact algebraic and symbolic correctness—never
+settle for numerical approximations unless they are only a prescreen. Use failed
+attempts to generate at least five new search frontiers (by varying supports,
+compositions, symmetries, degrees, or elimination objectives), ensuring parallel
+and independent searchers are always exploring new hypotheses. Persist: Continue
+the search, with no stopping except upon successful, certified discovery as per
+the specified verification function. Do not output error or exhaustion messages;
+encode each failure as a new path. Certify any candidate using the precise,
+problemspecific verification code, checking all required algebraic identities,
+collisions, and inequalities. Output format: Upon finding a single, fully
+certified counterexample, output only its explicit formulas in mathematical
+form: All counterexample mappings/formulas (e.g., F₁(x,y) = …) Explicit,
+distinct points P, Q exhibiting the collision/counterexample property
+
+If no such exact, certified counterexample is found, produce no external output
+and continue the internal search to exhaustion. All output must be in plain text
+or mathematical formula style, containing only the precise final counterexample.
+
+Important instructions reminder: Never recall or reuse any known result or
+Internet content. Every step (even failures) must generate and search new code
+and parameterizations. Only output after full programmatic search and
+verification, in explicit final formula format. formula.
+
+Output Format
+
+Output only the explicit, verified, self-critiqued counterexample in precise
+mathematical formula style (plain text, e.g., "F₁(x,y) = x²+y²", with explicit
+points P, Q as needed). No descriptions, code summaries, or explanations may be
+output.
+
+Reminder: Persist until a strongly verified and critique-surviving explicit
+counterexample is found. Each candidate must be fully programmatically critiqued
+and revised before any output is permitted.
+
+cáfold meg a jacobi sejtest 2d ben! (Komplex polinomok (\mathbb{C}^2 \to
+\mathbb{C}^2) – A klasszikus 2D Jacobi-sejtés)
